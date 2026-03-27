@@ -1,0 +1,43 @@
+============================================================
+FULL INSTANCE SNAPSHOT
+============================================================
+Created: 20260327_091925
+Source Server: ubuntu@test.potlimitomaha.xyz
+Created By: warrenabrahams@warrenabrahams-Latitude-5540
+Instance IP: 34.240.38.186
+Domain: test.potlimitomaha.xyz
+
+NETWORK CONFIGURATION:
+- EIP 52.16.14.220 (eni-01d1b8be27586fa92) - Remote Control
+- Private IP: 172.31.41.21
+- Flask App: http://172.31.41.21:5000
+- Nginx Proxy: https://test.potlimitomaha.xyz:8080
+
+FILES CAPTURED:
+✓ /opt/plo-equity/app.py (Flask backend)
+✓ /opt/plo-equity/static/* (Frontend files)
+✓ /opt/plo-equity/hand-collector/* (Hand collection system)
+✓ /opt/nginx-config/nginx.conf (Nginx configuration)
+✓ Docker container status
+✓ Network configuration
+✓ Process list
+✓ System resources
+✓ EIP/ENI configuration
+
+COMPONENTS:
+- Remote Control UI (port 8080)
+- Flask API (172.31.41.21:5000)
+- Hand Collector
+- Nginx Proxy (Docker)
+- 8 Chrome Containers (chrome1-8)
+- N4P API (Node.js)
+
+To create AWS EBS snapshot:
+  aws ec2 create-snapshot \
+    --volume-id <vol-id> \
+    --description "PLO Instance 20260327_091925" \
+    --region eu-west-1
+
+To restore files:
+  bash restore-full-instance.sh full_instance_20260327_091925
+

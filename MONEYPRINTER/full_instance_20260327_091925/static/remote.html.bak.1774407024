@@ -1,0 +1,1059 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>N4P Remote Table Control</title>
+  <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --felt:        #0a2e1a;
+      --felt-light:  #0f3d22;
+      --rail:        #2a1a06;
+      --rail-gold:   #c9922a;
+      --rail-shine:  #f0c060;
+      --bg:          #080c0a;
+      --bg2:         #0e1410;
+      --bg3:         #141c17;
+      --card-bg:     #1a2420;
+      --border:      rgba(201,146,42,0.25);
+      --border-hot:  rgba(201,146,42,0.7);
+      --text:        #d4c9a8;
+      --text-dim:    #7a7060;
+      --text-bright: #f0e8c8;
+      --gold:        #c9922a;
+      --gold-bright: #f0c060;
+      --green:       #1db954;
+      --green-dim:   #0d6b30;
+      --red:         #e05252;
+      --red-dim:     #7a1f1f;
+      --blue:        #4a9eda;
+      --blue-dim:    #1a4a6a;
+      --amber:       #e8a020;
+      --amber-dim:   #6a4008;
+      --hero-glow:   rgba(74,158,218,0.3);
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Rajdhani', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      padding: 16px;
+      overflow-x: hidden;
+      background-image:
+        radial-gradient(ellipse at 20% 0%, rgba(10,46,26,0.6) 0%, transparent 60%),
+        radial-gradient(ellipse at 80% 100%, rgba(42,26,6,0.4) 0%, transparent 60%);
+    }
+
+    /* ── Header ── */
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 14px 20px;
+      background: linear-gradient(90deg, rgba(10,46,26,0.9), rgba(14,20,16,0.9));
+      border: 1px solid var(--border);
+      border-top: 2px solid var(--gold);
+      border-radius: 8px;
+      margin-bottom: 18px;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .logo-mark {
+      width: 36px;
+      height: 36px;
+      background: var(--gold);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 14px;
+      color: #000;
+      flex-shrink: 0;
+      box-shadow: 0 0 12px rgba(201,146,42,0.5);
+    }
+
+    .header h1 {
+      font-size: clamp(1.1em, 3vw, 1.5em);
+      font-weight: 700;
+      letter-spacing: 3px;
+      color: var(--text-bright);
+      text-transform: uppercase;
+    }
+
+    .header h1 span {
+      color: var(--gold);
+    }
+
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .test-badge {
+      background: var(--amber-dim);
+      border: 1px solid var(--amber);
+      color: var(--amber);
+      padding: 4px 12px;
+      border-radius: 4px;
+      font-size: 0.75em;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+    }
+
+    .connection-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--green);
+      box-shadow: 0 0 8px var(--green);
+      animation: pulse-dot 2s ease-in-out infinite;
+    }
+
+    @keyframes pulse-dot {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+
+    /* ── Layout ── */
+    .main-layout {
+      display: grid;
+      grid-template-columns: 1fr 300px;
+      gap: 16px;
+      max-width: 1400px;
+      margin: 0 auto;
+      align-items: start;
+    }
+
+    @media (max-width: 1100px) {
+      .main-layout { grid-template-columns: 1fr; }
+    }
+
+    /* ── Table area ── */
+    .table-area {
+      position: relative;
+    }
+
+    .poker-table-container {
+      position: relative;
+      padding: 20px;
+    }
+
+    .loading {
+      text-align: center;
+      padding: 60px 20px;
+      font-size: 1.1em;
+      color: var(--text-dim);
+      letter-spacing: 2px;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .spinner {
+      display: inline-block;
+      width: 18px;
+      height: 18px;
+      border: 2px solid rgba(201,146,42,0.2);
+      border-radius: 50%;
+      border-top-color: var(--gold);
+      animation: spin 0.8s linear infinite;
+      margin-right: 10px;
+      vertical-align: middle;
+    }
+
+    /* ── Poker felt table ── */
+    .poker-table {
+      position: relative;
+      width: 100%;
+      max-width: 760px;
+      height: 460px;
+      margin: 70px auto;
+      background: radial-gradient(ellipse at center, var(--felt-light) 0%, var(--felt) 70%);
+      border-radius: 50%;
+      border: 14px solid var(--rail);
+      box-shadow:
+        inset 0 0 60px rgba(0,0,0,0.6),
+        0 0 0 3px var(--rail-gold),
+        0 0 0 4px rgba(201,146,42,0.15),
+        0 12px 40px rgba(0,0,0,0.8);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* Rail shine line */
+    .poker-table::before {
+      content: '';
+      position: absolute;
+      inset: -14px;
+      border-radius: 50%;
+      background: linear-gradient(135deg,
+        rgba(240,192,96,0.3) 0%,
+        transparent 30%,
+        transparent 70%,
+        rgba(240,192,96,0.15) 100%);
+      pointer-events: none;
+    }
+
+    /* Felt logo */
+    .poker-table::after {
+      content: 'N4P';
+      position: absolute;
+      font-family: 'Rajdhani', sans-serif;
+      font-size: 3em;
+      font-weight: 700;
+      letter-spacing: 8px;
+      color: rgba(255,255,255,0.04);
+      pointer-events: none;
+      user-select: none;
+    }
+
+    /* ── Center info ── */
+    .table-info-center {
+      text-align: center;
+      z-index: 2;
+      position: relative;
+    }
+
+    .pot-display {
+      font-size: 2em;
+      font-weight: 700;
+      color: var(--gold-bright);
+      letter-spacing: 1px;
+      text-shadow: 0 0 20px rgba(240,192,96,0.4);
+      font-family: 'Share Tech Mono', monospace;
+    }
+
+    .street-display {
+      font-size: 0.8em;
+      color: var(--text-dim);
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      margin-top: 4px;
+    }
+
+    .board-display {
+      display: flex;
+      justify-content: center;
+      gap: 6px;
+      margin-top: 14px;
+      flex-wrap: wrap;
+    }
+
+    .card {
+      background: #f5f0e8;
+      color: #1a1a1a;
+      padding: 10px 7px;
+      border-radius: 5px;
+      font-weight: 700;
+      font-size: 1em;
+      min-width: 42px;
+      text-align: center;
+      box-shadow:
+        0 3px 8px rgba(0,0,0,0.5),
+        inset 0 1px 0 rgba(255,255,255,0.8);
+      font-family: 'Share Tech Mono', monospace;
+      border: 1px solid rgba(0,0,0,0.15);
+    }
+
+    .card.red { color: #c0392b; }
+
+    /* ── Seats container ── */
+    .seats-container {
+      position: relative;
+    }
+
+    .seat {
+      position: absolute;
+      width: 170px;
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-left: 3px solid transparent;
+      border-radius: 8px;
+      padding: 12px;
+      transition: border-color 0.3s, box-shadow 0.3s;
+    }
+
+    /* ── 5 seat states ── */
+    .seat.empty {
+      border-left-color: #2a3030;
+      opacity: 0.45;
+    }
+
+    /* Seated — name detected, no n4p.js */
+    .seat.seated {
+      border-left-color: var(--text-dim);
+      background: linear-gradient(135deg, rgba(42,48,40,0.15), var(--card-bg));
+    }
+
+    /* Connected — n4p.js running on this seat */
+    .seat.connected {
+      border-left-color: var(--green-dim);
+      background: linear-gradient(135deg, rgba(13,107,48,0.14), var(--card-bg));
+    }
+
+    /* On clock — it's this player's turn right now */
+    .seat.on-clock {
+      border-left-color: var(--amber);
+      background: linear-gradient(135deg, rgba(106,64,8,0.22), var(--card-bg));
+      box-shadow: 0 0 0 1px rgba(232,160,32,0.35), 0 0 18px rgba(232,160,32,0.15);
+    }
+
+    /* Pending command queued */
+    .seat.has-pending {
+      border-left-color: var(--gold);
+      background: linear-gradient(135deg, rgba(201,146,42,0.12), var(--card-bg));
+    }
+
+    /* Clock ring animation on on-clock seat */
+    .clock-ring {
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      border: 2px solid var(--amber);
+      border-top-color: transparent;
+      animation: spin 0.8s linear infinite;
+      vertical-align: middle;
+      margin-left: 4px;
+    }
+
+    /* Connected badge */
+    .connected-badge {
+      font-size: 0.6em;
+      letter-spacing: 1px;
+      color: var(--green);
+      font-weight: 700;
+      text-transform: uppercase;
+      opacity: 0.8;
+    }
+
+    /* seat positions — same oval as original */
+    .seat[data-seat="1"] { top: -80px; left: 50%; transform: translateX(-50%); }
+    .seat[data-seat="2"] { top: -40px; left: 72%; }
+    .seat[data-seat="3"] { top: 120px; left: 85%; }
+    .seat[data-seat="4"] { top: 320px; left: 75%; }
+    .seat[data-seat="5"] { top: 420px; left: 50%; transform: translateX(-50%); }
+    .seat[data-seat="6"] { top: 320px; left: -5%; }
+    .seat[data-seat="7"] { top: 120px; left: -15%; }
+    .seat[data-seat="8"] { top: -40px; left: 8%; }
+    .seat[data-seat="9"] { top: 60px; left: 0%; }
+
+    .seat-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 6px;
+    }
+
+    .seat-number {
+      font-size: 0.72em;
+      font-weight: 600;
+      color: var(--text-dim);
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+
+    .seat-status-indicator {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+    }
+
+    .seat-status-indicator.online  { background: var(--green); box-shadow: 0 0 6px var(--green); }
+    .seat-status-indicator.offline { background: #2a3030; }
+    .seat-status-indicator.pending { background: var(--amber); box-shadow: 0 0 6px var(--amber); animation: pulse-pending 1.2s ease-in-out infinite; }
+
+    @keyframes pulse-pending { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+    .seat-name {
+      font-size: 1em;
+      font-weight: 600;
+      color: var(--text-bright);
+      text-align: center;
+      margin: 6px 0;
+      min-height: 1.3em;
+      word-break: break-word;
+      letter-spacing: 0.5px;
+    }
+
+    .seat-name.empty-label {
+      color: var(--text-dim);
+      font-style: italic;
+      font-weight: 400;
+      font-size: 0.85em;
+    }
+
+    .seat-stack {
+      text-align: center;
+      font-size: 0.95em;
+      color: var(--gold);
+      font-weight: 700;
+      font-family: 'Share Tech Mono', monospace;
+      margin-bottom: 8px;
+      letter-spacing: 0.5px;
+    }
+
+    .dealer-button {
+      position: absolute;
+      top: 6px;
+      right: 6px;
+      width: 22px;
+      height: 22px;
+      background: var(--gold-bright);
+      color: #000;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 0.7em;
+      border: 2px solid #fff;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.5);
+    }
+
+    .pending-cmd {
+      margin-top: 6px;
+      padding: 5px 8px;
+      background: rgba(106,64,8,0.3);
+      border-left: 2px solid var(--amber);
+      border-radius: 3px;
+      font-size: 0.75em;
+      font-weight: 600;
+      color: var(--amber);
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+
+    /* ── Seat action buttons ── */
+    .seat-actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 4px;
+      margin-top: 8px;
+    }
+
+    .seat-actions button {
+      padding: 5px 4px;
+      border: 1px solid transparent;
+      border-radius: 4px;
+      font-family: 'Rajdhani', sans-serif;
+      font-weight: 700;
+      font-size: 0.72em;
+      cursor: pointer;
+      transition: all 0.15s;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      background: var(--bg3);
+      color: var(--text);
+    }
+
+    .seat-actions button:hover:not(:disabled) {
+      transform: translateY(-1px);
+      box-shadow: 0 3px 8px rgba(0,0,0,0.4);
+    }
+
+    .seat-actions button:active:not(:disabled) {
+      transform: translateY(0);
+    }
+
+    .seat-actions button:disabled {
+      opacity: 0.2;
+      cursor: not-allowed;
+    }
+
+    .seat-actions button:focus {
+      outline: 2px solid var(--gold);
+      outline-offset: 2px;
+    }
+
+    .btn-fold    { border-color: var(--red-dim);   color: var(--red);   background: rgba(122,31,31,0.2); }
+    .btn-check   { border-color: var(--green-dim); color: var(--green); background: rgba(13,107,48,0.2); }
+    .btn-call    { border-color: var(--blue-dim);  color: var(--blue);  background: rgba(26,74,106,0.2); }
+    .btn-raise   { border-color: var(--amber-dim); color: var(--amber); background: rgba(106,64,8,0.2); }
+    .btn-cashout { border-color: rgba(201,146,42,0.3); color: var(--gold); background: rgba(42,26,6,0.3); grid-column: 1 / -1; }
+
+    .btn-fold:hover:not(:disabled)    { background: rgba(122,31,31,0.5);  border-color: var(--red); }
+    .btn-check:hover:not(:disabled)   { background: rgba(13,107,48,0.5);  border-color: var(--green); }
+    .btn-call:hover:not(:disabled)    { background: rgba(26,74,106,0.5);  border-color: var(--blue); }
+    .btn-raise:hover:not(:disabled)   { background: rgba(106,64,8,0.5);   border-color: var(--amber); }
+    .btn-cashout:hover:not(:disabled) { background: rgba(42,26,6,0.6);    border-color: var(--gold); }
+
+    /* ── Blink on new player ── */
+    @keyframes blink-pulse {
+      0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.8;transform:scale(1.02)}
+    }
+    .blinker { animation: blink-pulse 0.5s ease-in-out 3; }
+
+    /* ── Right sidebar ── */
+    .sidebar {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .panel {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-top: 2px solid var(--gold);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    .panel-header {
+      padding: 10px 16px;
+      background: rgba(201,146,42,0.06);
+      border-bottom: 1px solid var(--border);
+      font-size: 0.72em;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--gold);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .panel-header::before {
+      content: '';
+      width: 6px;
+      height: 6px;
+      background: var(--gold);
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    /* ── Command log ── */
+    .command-log {
+      flex: 1;
+    }
+
+    .log-entries {
+      max-height: 380px;
+      overflow-y: auto;
+      padding: 8px;
+      scrollbar-width: thin;
+      scrollbar-color: var(--border) transparent;
+    }
+
+    .log-entries::-webkit-scrollbar { width: 4px; }
+    .log-entries::-webkit-scrollbar-track { background: transparent; }
+    .log-entries::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+    .log-entry {
+      padding: 8px 10px;
+      margin-bottom: 4px;
+      border-radius: 4px;
+      font-size: 0.82em;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      border-left: 2px solid transparent;
+    }
+
+    .log-entry-content {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex: 1;
+      min-width: 0;
+    }
+
+    .log-entry-content span:last-child {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .log-icon {
+      flex-shrink: 0;
+      font-size: 0.9em;
+    }
+
+    .log-timestamp {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 0.78em;
+      color: var(--text-dim);
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .status-info    { background: rgba(74,158,218,0.08);  border-left-color: var(--blue);  color: var(--text); }
+    .status-success { background: rgba(29,185,84,0.08);   border-left-color: var(--green); color: var(--text); }
+    .status-warning { background: rgba(232,160,32,0.08);  border-left-color: var(--amber); color: var(--text); }
+    .status-error   { background: rgba(224,82,82,0.08);   border-left-color: var(--red);   color: var(--text); }
+    .status-empty   { background: rgba(42,48,48,0.3);     border-left-color: #2a3030;      color: var(--text-dim); }
+
+    /* ── Table stats panel ── */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1px;
+      background: var(--border);
+    }
+
+    .stat-cell {
+      background: var(--card-bg);
+      padding: 12px 14px;
+      text-align: center;
+    }
+
+    .stat-label {
+      font-size: 0.65em;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      margin-bottom: 4px;
+    }
+
+    .stat-value {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 1.1em;
+      font-weight: 600;
+      color: var(--text-bright);
+    }
+
+    .stat-value.gold { color: var(--gold-bright); }
+
+    /* ── Pre-select panel ── */
+    .preselect-grid {
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .preselect-btn {
+      width: 100%;
+      padding: 8px 12px;
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      color: var(--text-dim);
+      font-family: 'Rajdhani', sans-serif;
+      font-size: 0.8em;
+      font-weight: 600;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      cursor: pointer;
+      text-align: left;
+      transition: all 0.15s;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .preselect-btn:hover { border-color: var(--gold); color: var(--text); }
+
+    .preselect-btn.active {
+      background: rgba(201,146,42,0.1);
+      border-color: var(--gold);
+      color: var(--gold);
+    }
+
+    .preselect-indicator {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      border: 1.5px solid currentColor;
+      flex-shrink: 0;
+    }
+
+    .preselect-btn.active .preselect-indicator {
+      background: var(--gold);
+      border-color: var(--gold);
+    }
+
+    /* ── Responsive ── */
+    @media (max-width: 768px) {
+      .poker-table { transform: scale(0.65); transform-origin: top center; }
+      .seats-container { transform: scale(0.65); transform-origin: top center; }
+      .seat { width: 155px; }
+    }
+
+    .sr-only {
+      position: absolute; width: 1px; height: 1px;
+      padding: 0; margin: -1px; overflow: hidden;
+      clip: rect(0,0,0,0); white-space: nowrap; border-width: 0;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="header">
+    <div class="header-left">
+      <div class="logo-mark">N4P</div>
+      <h1><span>Remote</span> Table Control</h1>
+    </div>
+    <div class="header-right">
+      <div class="connection-dot" id="connectionDot"></div>
+      <div class="test-badge" role="status">Test Server</div>
+    </div>
+  </div>
+
+  <div class="main-layout">
+
+    <!-- Left: table -->
+    <div class="table-area">
+      <div class="poker-table-container">
+        <div class="loading" id="loading" role="status" aria-live="polite">
+          <span class="spinner" aria-hidden="true"></span>
+          Connecting to table...
+        </div>
+
+        <div class="seats-container" id="seatsContainer" style="display:none;">
+          <div class="poker-table">
+            <div class="table-info-center" role="region" aria-label="Table information">
+              <div class="pot-display" id="potDisplay" aria-live="polite">R 0.00</div>
+              <div class="street-display" id="streetDisplay" aria-live="polite">WAITING</div>
+              <div class="board-display" id="boardDisplay" aria-label="Community cards"></div>
+            </div>
+          </div>
+          <div id="seatsWrapper" role="group" aria-label="Player seats"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right: sidebar -->
+    <div class="sidebar">
+
+      <!-- Stats -->
+      <div class="panel">
+        <div class="panel-header">Table Stats</div>
+        <div class="stats-grid">
+          <div class="stat-cell">
+            <div class="stat-label">Pot</div>
+            <div class="stat-value gold" id="statPot">R0</div>
+          </div>
+          <div class="stat-cell">
+            <div class="stat-label">Street</div>
+            <div class="stat-value" id="statStreet">—</div>
+          </div>
+          <div class="stat-cell">
+            <div class="stat-label">Players</div>
+            <div class="stat-value" id="statPlayers">0</div>
+          </div>
+          <div class="stat-cell">
+            <div class="stat-label">Table</div>
+            <div class="stat-value" id="statTable">—</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Pre-select -->
+      <div class="panel">
+        <div class="panel-header">Pre-select Action</div>
+        <div class="preselect-grid" id="preselectGrid">
+          <button class="preselect-btn" data-cmd="check_fold" onclick="setPreselect(this)">
+            <span class="preselect-indicator"></span> Check / Fold
+          </button>
+          <button class="preselect-btn" data-cmd="check_only" onclick="setPreselect(this)">
+            <span class="preselect-indicator"></span> Check Only
+          </button>
+          <button class="preselect-btn" data-cmd="call_any" onclick="setPreselect(this)">
+            <span class="preselect-indicator"></span> Call Any / Check
+          </button>
+          <button class="preselect-btn" data-cmd="fold_any" onclick="setPreselect(this)">
+            <span class="preselect-indicator"></span> Fold Any Bet
+          </button>
+          <button class="preselect-btn" data-cmd="sit_out" onclick="setPreselect(this)">
+            <span class="preselect-indicator"></span> Sit Out Hand
+          </button>
+          <button class="preselect-btn" data-cmd="sit_out_bb" onclick="setPreselect(this)">
+            <span class="preselect-indicator"></span> Sit Out BB
+          </button>
+        </div>
+      </div>
+
+      <!-- Command log -->
+      <div class="panel command-log">
+        <div class="panel-header">Command Log</div>
+        <div class="log-entries" id="commandLog" role="log" aria-live="polite" aria-atomic="false">
+          <div class="log-entry status-info">
+            <div class="log-entry-content">
+              <span class="log-icon">ℹ</span>
+              <span>System ready</span>
+            </div>
+            <span class="log-timestamp" id="systemTime"></span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    const API_BASE = '/api';
+    let commandLogEntries = [];
+    let activePreselect = null;
+    let heroTableId = null;
+    let heroSeatNo = null;
+
+    // ── Pre-select ──────────────────────────────────────────────────────────
+
+    function setPreselect(btn) {
+      const cmd = btn.dataset.cmd;
+      const grid = document.getElementById('preselectGrid');
+
+      if (btn.classList.contains('active')) {
+        // Toggle off
+        btn.classList.remove('active');
+        activePreselect = null;
+        if (heroTableId && heroSeatNo) {
+          queueCommand(heroTableId, heroSeatNo, 'clear_preaction');
+        }
+        addLogEntry('Pre-select cleared', 'info');
+        return;
+      }
+
+      grid.querySelectorAll('.preselect-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      activePreselect = cmd;
+
+      if (heroTableId && heroSeatNo) {
+        queueCommand(heroTableId, heroSeatNo, cmd);
+      } else {
+        addLogEntry('Pre-select set: ' + cmd + ' (no hero seat connected)', 'warning');
+      }
+    }
+
+    // ── Log ─────────────────────────────────────────────────────────────────
+
+    function addLogEntry(message, type = 'info') {
+      const timestamp = new Date().toLocaleTimeString();
+      const icons = { info: 'ℹ', success: '✓', warning: '⚠', error: '✗' };
+      const statusClasses = {
+        info: 'status-info', success: 'status-success',
+        warning: 'status-warning', error: 'status-error'
+      };
+
+      commandLogEntries.unshift({
+        message, timestamp, type,
+        icon: icons[type] || 'ℹ',
+        statusClass: statusClasses[type] || 'status-info'
+      });
+
+      if (commandLogEntries.length > 30) commandLogEntries = commandLogEntries.slice(0, 30);
+      renderCommandLog();
+    }
+
+    function renderCommandLog() {
+      const logEl = document.getElementById('commandLog');
+      logEl.innerHTML = commandLogEntries.map(e => `
+        <div class="log-entry ${e.statusClass}" role="status">
+          <div class="log-entry-content">
+            <span class="log-icon" aria-hidden="true">${e.icon}</span>
+            <span>${e.message}</span>
+          </div>
+          <span class="log-timestamp">${e.timestamp}</span>
+        </div>
+      `).join('');
+    }
+
+    // ── Commands ─────────────────────────────────────────────────────────────
+
+    function queueCommand(tableId, seatNo, commandType) {
+      fetch(API_BASE + '/commands/queue', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ table_id: tableId, seat_no: seatNo, command_type: commandType })
+      })
+      .then(r => r.json())
+      .then(data => {
+        if (data.ok) {
+          addLogEntry(`${commandType.toUpperCase()} → Seat ${seatNo}`, 'success');
+        } else {
+          addLogEntry(`Failed: ${data.error}`, 'error');
+        }
+      })
+      .catch(err => addLogEntry(`Network error: ${err.message}`, 'error'));
+    }
+
+    // ── Render helpers ────────────────────────────────────────────────────────
+
+    function renderSeat(seat, tableId) {
+      const isOccupied  = !!seat.name;
+      const isConnected = !!seat.connected || !!seat.is_hero;
+      const isOnClock   = !!seat.on_clock;
+      const hasPending  = !!seat.pending_cmd;
+
+      // State priority: on-clock > has-pending > connected > seated > empty
+      let stateClass = 'empty';
+      if (isOccupied) stateClass = 'seated';
+      if (isConnected) stateClass = 'connected';
+      if (isOnClock)  stateClass = 'on-clock';
+      const pendingClass = hasPending ? 'has-pending' : '';
+
+      const indicatorClass = hasPending ? 'pending' : (isConnected ? 'online' : (isOccupied ? 'offline' : 'offline'));
+      const stackDisplay = isOccupied && seat.stack_zar != null
+        ? `R${Number(seat.stack_zar).toFixed(2)}` : '';
+
+      // Last seen ago
+      let lastSeenStr = '';
+      if (seat.last_seen) {
+        const ago = Math.round((Date.now() / 1000) - seat.last_seen);
+        lastSeenStr = ago < 60 ? `${ago}s ago` : `${Math.round(ago/60)}m ago`;
+      }
+
+      // Track connected seats for pre-select targeting
+      if (isConnected) { heroTableId = tableId; heroSeatNo = seat.seat_no; }
+
+      return `
+        <div class="seat ${stateClass} ${pendingClass}"
+             data-seat="${seat.seat_no}"
+             id="seat-${seat.seat_no}"
+             role="region"
+             aria-label="Seat ${seat.seat_no}${isOccupied ? ', ' + seat.name : ', empty'}">
+
+          ${seat.is_dealer ? '<div class="dealer-button" title="Dealer">D</div>' : ''}
+
+          <div class="seat-header">
+            <span class="seat-number">
+              Seat ${seat.seat_no}
+              ${isOnClock ? '<span class="clock-ring" title="On clock"></span>' : ''}
+            </span>
+            <span class="seat-status-indicator ${indicatorClass}"
+                  role="status"
+                  aria-label="${isOnClock ? 'On clock' : (isConnected ? 'Connected' : (isOccupied ? 'Seated' : 'Empty'))}">
+            </span>
+          </div>
+
+          <div class="seat-name ${isOccupied ? '' : 'empty-label'}">
+            ${isOccupied ? seat.name : 'Available'}
+          </div>
+
+          ${isConnected && lastSeenStr ? `
+            <div style="text-align:center;font-size:0.65em;color:var(--green);opacity:0.7;margin-bottom:4px;font-family:'Share Tech Mono',monospace;">
+              ● ${lastSeenStr}
+            </div>` : ''}
+
+          ${stackDisplay ? `<div class="seat-stack">${stackDisplay}</div>` : ''}
+
+          ${isOnClock ? `
+            <div style="text-align:center;font-size:0.7em;font-weight:700;letter-spacing:2px;color:var(--amber);margin-bottom:6px;text-transform:uppercase;">
+              ▶ Your Turn
+            </div>` : ''}
+
+          ${hasPending ? `
+            <div class="pending-cmd" role="status" aria-live="polite">
+              ⏳ ${seat.pending_cmd}
+            </div>` : ''}
+
+          ${isConnected ? `
+          <div class="seat-actions">
+            <button class="btn-fold"
+                    onclick="queueCommand('${tableId}',${seat.seat_no},'fold')"
+                    aria-label="Fold seat ${seat.seat_no}">Fold</button>
+            <button class="btn-check"
+                    onclick="queueCommand('${tableId}',${seat.seat_no},'check')"
+                    aria-label="Check seat ${seat.seat_no}">Check</button>
+            <button class="btn-call"
+                    onclick="queueCommand('${tableId}',${seat.seat_no},'call')"
+                    aria-label="Call seat ${seat.seat_no}">Call</button>
+            <button class="btn-raise"
+                    onclick="queueCommand('${tableId}',${seat.seat_no},'raise_max')"
+                    aria-label="Raise max seat ${seat.seat_no}">Max</button>
+            <button class="btn-cashout"
+                    onclick="queueCommand('${tableId}',${seat.seat_no},'cashout')"
+                    aria-label="Cashout seat ${seat.seat_no}">Cash Out</button>
+          </div>` : ''}
+        </div>
+      `;
+    }
+
+    function renderCards(cards) {
+      if (!cards || !cards.length) return '';
+      return cards.map(card => {
+        const suit = card.charAt(0);
+        const rank = card.substring(1).toUpperCase();
+        const sym  = { h:'♥', d:'♦', c:'♣', s:'♠' }[suit] || suit;
+        const isRed = suit === 'h' || suit === 'd';
+        return `<div class="card${isRed ? ' red' : ''}" role="img" aria-label="${rank} of ${suit}">${rank}${sym}</div>`;
+      }).join('');
+    }
+
+    // ── Table polling ─────────────────────────────────────────────────────────
+
+    let previousSeats = {};
+
+    function updateTable() {
+      fetch(API_BASE + '/table/latest')
+        .then(r => r.json())
+        .then(data => {
+          if (!data.ok) { addLogEntry('Failed to fetch table data', 'warning'); return; }
+
+          const table = data.table;
+
+          document.getElementById('loading').style.display = 'none';
+          document.getElementById('seatsContainer').style.display = 'block';
+          document.getElementById('connectionDot').style.background = 'var(--green)';
+
+          // Pot + street
+          const pot = typeof table.pot_zar === 'number' ? table.pot_zar : 0;
+          document.getElementById('potDisplay').textContent = `R ${pot.toFixed(2)}`;
+          document.getElementById('streetDisplay').textContent = table.street || 'WAITING';
+
+          // Sidebar stats
+          document.getElementById('statPot').textContent     = `R${pot.toFixed(2)}`;
+          document.getElementById('statStreet').textContent  = table.street || '—';
+          document.getElementById('statTable').textContent   = table.table_id || '—';
+          const occupied = (table.seats || []).filter(s => s.name).length;
+          document.getElementById('statPlayers').textContent = occupied + ' / ' + (table.seats || []).length;
+
+          // Board
+          const board = table.board || {};
+          let boardCards = [...(board.flop || [])];
+          if (board.turn)  boardCards.push(board.turn);
+          if (board.river) boardCards.push(board.river);
+          document.getElementById('boardDisplay').innerHTML = renderCards(boardCards);
+
+          // Seats — blink on new player
+          const currentSeats = {};
+          (table.seats || []).forEach(s => { currentSeats[s.seat_no] = s; });
+
+          Object.keys(currentSeats).forEach(sno => {
+            const cur = currentSeats[sno], prev = previousSeats[sno];
+            if (cur.name && (!prev || !prev.name)) {
+              setTimeout(() => {
+                const el = document.getElementById(`seat-${sno}`);
+                if (el) {
+                  el.classList.add('blinker');
+                  setTimeout(() => el.classList.remove('blinker'), 1500);
+                }
+              }, 100);
+              addLogEntry(`${cur.name} joined Seat ${sno}`, 'success');
+            }
+          });
+
+          document.getElementById('seatsWrapper').innerHTML =
+            (table.seats || []).map(s => renderSeat(s, table.table_id)).join('');
+
+          previousSeats = currentSeats;
+        })
+        .catch(err => {
+          document.getElementById('connectionDot').style.background = 'var(--red)';
+          addLogEntry(`Connection error: ${err.message}`, 'error');
+        });
+    }
+
+    // Init
+    document.getElementById('systemTime').textContent = new Date().toLocaleTimeString();
+    updateTable();
+    setInterval(updateTable, 2000);
+  </script>
+</body>
+</html>

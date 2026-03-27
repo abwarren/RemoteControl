@@ -1,0 +1,7 @@
+NETWORK ID     NAME                         DRIVER    SCOPE
+5890bcb95477   bridge                       bridge    local
+54edc02664a6   browser-docker_browser-net   bridge    local
+e0332cf11c6d   host                         host      local
+17823a4b742d   none                         null      local
+db727ea3c0d3   pokerbet-eip-net             macvlan   local
+[]
