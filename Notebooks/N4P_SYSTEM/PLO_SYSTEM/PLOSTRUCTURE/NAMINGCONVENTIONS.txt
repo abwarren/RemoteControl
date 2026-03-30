@@ -1,0 +1,41 @@
+Content-Type: text/x-zim-wiki
+Wiki-Format: zim 0.6
+Creation-Date: 2026-03-28T20:13:55+02:00
+
+====== NAMINGCONVENTIONS ======
+Created Saturday 28 March 2026
+HOW TO ASSIGN IP WITH AWS 
+
+  - 63.35.153.99 → 172.31.35.141                                                                                              
+	  - 54.194.243.142 → 172.31.42.51                                                                                               
+	  - 54.78.58.82 → 172.31.42.220                
+
+  # 1. Create directory                                     
+  mkdir -p ~/protonvpn-bots/vpn-configs                                                                                             
+  cd ~/protonvpn-bots                                                                                                               
+                                                                                                                                    
+  # 2. Sign up ProtonVPN Plus: https://account.protonvpn.com/signup ($5/month)                                                      
+                                                                                                                                    
+  # 3. Download configs (from ProtonVPN dashboard):                                                                                 
+  #    - Go to: Downloads → OpenVPN config files            
+  #    - Platform: Linux                                                                                                            
+  #    - Protocol: UDP                                                                                                              
+  #    - Download 8 different servers                                                                                               
+                                                                                                                                    
+  # 4. Transfer configs to server (if downloaded on local machine):                                                                 
+  scp -i /home/ploxyz.pem ~/Downloads/*.ovpn ubuntu@test.potlimitomaha.xyz:~/protonvpn-bots/vpn-configs/                            
+                                                                                                                                    
+  # 5. Get OpenVPN credentials:                                                                                                     
+  #    - ProtonVPN Dashboard → Account                                                                                              
+  #    - Copy "OpenVPN/IKEv2 username" (like: username+pmp)                                                                         
+  #    - Copy "OpenVPN password" (NOT account password)                                                                             
+                                                                                                                                    
+  # 6. Create auth file:                                                                                                            
+  cat > ~/protonvpn-bots/vpn-configs/auth.txt << EOF                                                                                
+  your_openvpn_username+pmp                                                                                                         
+  your_openvpn_password                                                                                                             
+  EOF                                                                                                                               
+                                                                                                                                    
+  Then follow the full guide in /home/warrenabrahams/protonvpn-setup-guide.md                                                       
+                                                                                                                                    
+  Need help with any specific step?       
