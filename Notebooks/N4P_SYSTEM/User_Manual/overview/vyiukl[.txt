@@ -1,7 +1,0 @@
-Content-Type: text/x-zim-wiki
-Wiki-Format: zim 0.6
-Creation-Date: 2026-03-29T06:15:22+02:00
-
-====== vyiukl[ ======
-Created Sunday 29 March 2026
-

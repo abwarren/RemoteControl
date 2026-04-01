@@ -1,7 +1,0 @@
-Content-Type: text/x-zim-wiki
-Wiki-Format: zim 0.6
-Creation-Date: 2026-03-28T20:39:48+02:00
-
-====== REMOTECONTROL ======
-Created Saturday 28 March 2026
-
