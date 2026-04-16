@@ -1,0 +1,111 @@
+Content-Type: text/x-zim-wiki
+Wiki-Format: zim 0.6
+Creation-Date: 2026-04-02T08:37:59+02:00
+
+====== AGENTS ======
+Created Thursday 02 April 2026
+
+''Safe alternatives''
+''1. UI-only button test harness''
+
+''Create a test mode that:''
+
+''logs in with test accounts''
+''opens 2 seats in a staging/private table''
+''does not place strategic actions automatically''
+''validates buttons and states:''
+''Fold''
+''Check''
+''Call''
+''Bet''
+''Raise''
+''Sit out''
+''Buy-in''
+''Leave table''
+''Reconnect''
+''Chat''
+''Settings''
+''Time bank''
+''2. Manual assisted QA flow''
+
+''Use 2 controlled sessions and test:''
+
+''Step	Player 1	Player 2	Validate''
+''1	Join table	Join table	Seat state, buy-in modal''
+''2	Post blinds	Observe	Blinds render correctly''
+''3	Check/Call	Check/Call	Action buttons active/inactive correctly''
+''4	Small bet	Fold/Call	Pot updates''
+''5	Sit out / return	Observe	Presence state''
+''6	Leave table	Remain seated	Table cleanup''
+''3. Non-playing regression bot''
+
+''I can help you build a QA bot that only:''
+
+''logs in''
+''joins a test table''
+''verifies DOM selectors''
+''screenshots each state''
+''records button availability''
+''exits''
+
+''That keeps it in test/QA territory rather than automating gambling decisions.''
+
+''Safer prompt for your agent''
+''MISSION: QA ONLY — NO GAMEPLAY AUTOMATION''
+
+''Deploy 2 TEST users to a staging/private table for UI validation only.''
+
+''ALLOWED:''
+''- login''
+''- open lobby''
+''- join assigned private/staging table''
+''- open buy-in modal''
+''- verify seat state''
+''- verify action buttons render correctly''
+''- capture screenshots''
+''- log DOM selectors and button enabled/disabled states''
+''- leave table''
+''- repeat for both users''
+
+''NOT ALLOWED:''
+''- no autonomous gameplay''
+''- no strategic action selection''
+''- no real-money wagering''
+''- no playing hands''
+''- no decision engine''
+''- no multi-hand automation''
+
+''OUTPUT REQUIRED:''
+''- per-player screenshot pack''
+''- button state matrix''
+''- DOM selector verification''
+''- error log''
+''- pass/fail summary for every table control''
+''If you want full coverage, test these states''
+''lobby load''
+''login success/failure''
+''table join''
+''seat taken / seat open''
+''buy-in modal open/close''
+''min/max buy-in values''
+''Fold / Check / Call / Bet / Raise visible logic''
+''slider/input for bet sizing''
+''disconnected/reconnected state''
+''sit out / back''
+''table exit''
+''chat send''
+''balance updates''
+''hand history open''
+''mobile/responsive layout if applicable''
+''Better route''
+
+''If the goal is “test all buttons”, the correct build is:''
+
+''staging table''
+''fake chips / mock wallet''
+''QA-only accounts''
+''event logger''
+''DOM/state assertions''
+''screenshots on every action 🧪''
+
+''If you want, I can write you a strict QA-only Selenium/Playwright test plan for nuts4poker.com that logs in 2 test users, opens the table, validates every visible control, and exits without playing.''

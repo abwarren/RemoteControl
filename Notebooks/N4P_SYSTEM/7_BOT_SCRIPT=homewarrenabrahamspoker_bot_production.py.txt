@@ -1,0 +1,11 @@
+Content-Type: text/x-zim-wiki
+Wiki-Format: zim 0.6
+Creation-Date: 2026-04-03T02:30:26+02:00
+
+====== 7 BOT SCRIPT=homewarrenabrahamspoker bot production.py ======
+Created Friday 03 April 2026
+
+─Step 3: Deploy!
+
+  cd /home/warrenabrahams
+  ./deploy_9_bots_from_local.sh

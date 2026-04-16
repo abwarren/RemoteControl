@@ -1,0 +1,123 @@
+╔══════════════════════════════════════════════════════════════════╗
+║         POKERBET COST OPTIMIZATION - VISUAL COMPARISON           ║
+╚══════════════════════════════════════════════════════════════════╝
+
+┌─────────────────────────────────────────────────────────────────┐
+│                    STANDARD ARCHITECTURE                        │
+│                      $231.50/month                              │
+└─────────────────────────────────────────────────────────────────┘
+
+PostgreSQL (RDS):  ████████████████████████████████████ $99.00
+S3 Storage:        ████████████████████████████████████████████ $150.00
+Lambda:            █ $2.00
+                   ├────────────────────────────────────────────┤
+                   0              100              200     $231.50
+
+
+┌─────────────────────────────────────────────────────────────────┐
+│                   OPTIMIZED ARCHITECTURE                        │
+│                      $140.00/month                              │
+└─────────────────────────────────────────────────────────────────┘
+
+PostgreSQL (Self): ███ $8.00
+S3 Storage:        ████████████████████████████ $100.00
+Lambda:            █ $2.00
+                   ├────────────────────────────────────────────┤
+                   0              100              200      $140.00
+
+
+╔══════════════════════════════════════════════════════════════════╗
+║                         SAVINGS BREAKDOWN                        ║
+╚══════════════════════════════════════════════════════════════════╝
+
+PostgreSQL Migration:  $99 → $8    = -$91.00/month  (92% reduction)
+S3 Glacier Aggressive: $150 → $100 = -$50.00/month  (33% reduction)
+                                    ─────────────
+                       TOTAL SAVINGS: $91.50/month  (40% overall)
+
+
+╔══════════════════════════════════════════════════════════════════╗
+║                       ANNUAL PROJECTIONS                         ║
+╚══════════════════════════════════════════════════════════════════╝
+
+                   Standard    Optimized    Savings
+Year 1            $2,778      $1,500       $1,278
+Year 2            $2,778      $2,280       $498
+Year 3            $5,160      $3,480       $1,680
+                  ────────    ────────     ────────
+3-Year Total      $10,716     $7,260       $3,456 💰
+
+
+╔══════════════════════════════════════════════════════════════════╗
+║                      IMPLEMENTATION EFFORT                       ║
+╚══════════════════════════════════════════════════════════════════╝
+
+┌──────────────────────────────────────────────────────────────┐
+│  Task                              Days    Difficulty         │
+├──────────────────────────────────────────────────────────────┤
+│  1. Install PostgreSQL on EC2       1      ⭐ Easy          │
+│  2. Configure & optimize            1      ⭐⭐ Medium      │
+│  3. Run schema DDL                  0.5    ⭐ Easy          │
+│  4. Update Flask API connection     0.5    ⭐ Easy          │
+│  5. Setup backup scripts            1      ⭐⭐ Medium      │
+│  6. Update S3 lifecycle policy      0.5    ⭐ Easy          │
+│  7. Testing & validation            2      ⭐⭐ Medium      │
+│  8. Monitoring setup                1      ⭐⭐ Medium      │
+├──────────────────────────────────────────────────────────────┤
+│  TOTAL                              7 days                    │
+└──────────────────────────────────────────────────────────────┘
+
+
+╔══════════════════════════════════════════════════════════════════╗
+║                      KEY CHANGES SUMMARY                         ║
+╚══════════════════════════════════════════════════════════════════╝
+
+CHANGE 1: Move PostgreSQL from RDS to self-hosted on EC2
+──────────────────────────────────────────────────────────────
+Before:  RDS db.t3.medium (managed service)
+After:   PostgreSQL on existing Processing Instance
+Savings: $91/month
+Trade-off: Manual backups (automated with script)
+
+CHANGE 2: Aggressive S3 Glacier transition
+──────────────────────────────────────────────────────────────
+Before:  90-day Standard → Glacier
+After:   30-day Standard → Glacier Instant Retrieval
+Savings: $50/month
+Trade-off: More data in Glacier (still instant access)
+
+
+╔══════════════════════════════════════════════════════════════════╗
+║                         RISK ASSESSMENT                          ║
+╚══════════════════════════════════════════════════════════════════╝
+
+Risk                     Impact    Likelihood    Mitigation
+─────────────────────────────────────────────────────────────────
+Data loss (no RDS)       HIGH      LOW          Daily S3 backups
+Performance drop         MEDIUM    LOW          Tuned PostgreSQL config
+Glacier retrieval slow   LOW       LOW          Using Instant Retrieval
+Single instance failure  MEDIUM    LOW          30-min restore from backup
+
+
+╔══════════════════════════════════════════════════════════════════╗
+║                       RECOMMENDATION                             ║
+╚══════════════════════════════════════════════════════════════════╝
+
+✅ APPROVE AND IMPLEMENT
+
+Why:
+• 40% cost reduction ($91.50/month = $1,098/year)
+• Low implementation effort (1 week)
+• Acceptable trade-offs (manual backups, single instance)
+• Strong mitigation strategies in place
+• 3-year savings: $3,456
+
+When:
+• Best done BEFORE launching production workload
+• Marginal extra effort vs building on RDS first
+
+Break-even:
+• If building new system: 5.5 months
+• If migrating from RDS: 65 months (not worth it)
+
+Conclusion: OPTIMIZE FROM DAY ONE 🚀

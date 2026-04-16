@@ -1,0 +1,9 @@
+Content-Type: text/x-zim-wiki
+Wiki-Format: zim 0.6
+Creation-Date: 2026-04-09T05:24:01+02:00
+
+====== frontend ======
+Created Thursday 09 April 2026
+
+ i-0b34345558e6404c7 (FRONT_END) 
+I

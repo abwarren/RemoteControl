@@ -1,0 +1,261 @@
+(() => {
+  const STORAGE_KEY = "engineFlowToggles";
+
+  const defaultState = {
+    autoFill: true,
+    autoRunFlop: true,
+    manualTurnOnly: true,
+    clearRiver: true
+  };
+
+  // Runtime state for smart trigger
+  let lastFlop = null;
+  let lastSnapshotHash = null;
+  let isRunning = false;
+
+  // Adaptive polling state
+  const FAST_POLL = 1500;        // 1.5s when active
+  const SLOW_POLL = 5000;        // 5s when idle
+  const IDLE_THRESHOLD = 30000;  // 30s no change = idle
+  let lastDataChange = Date.now();
+  let currentInterval = FAST_POLL;
+  let pollTimer = null;
+
+  function loadState() {
+    try {
+      return { ...defaultState, ...(JSON.parse(localStorage.getItem(STORAGE_KEY)) || {}) };
+    } catch {
+      return { ...defaultState };
+    }
+  }
+
+  function saveState(state) {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  }
+
+  function hashSnapshot(text) {
+    return text.trim();
+  }
+
+  function extractFlop(text) {
+    const lines = text.split("\n").map(l => l.trim()).filter(Boolean);
+
+    for (const line of lines) {
+      if (line.length === 6) return line; // 3 cards (2 chars each)
+    }
+    return null;
+  }
+
+  function extractPlayers(text) {
+    return text
+      .split("\n")
+      .map(l => l.trim())
+      .filter(l => l.length === 8 || l.length === 10 || l.length === 12);
+  }
+
+  function findTextarea() {
+    return document.querySelector('textarea[rows="14"]');
+  }
+
+  function findRunButton() {
+    const buttons = [...document.querySelectorAll("button")];
+    return buttons.find(b => /run|calculate|eval|equity/i.test((b.innerText || "").trim()));
+  }
+
+  function updateStatus(state) {
+    const el = document.getElementById("engine-flow-status");
+    if (!el) return;
+    el.textContent =
+      `AUTO_FILL=${state.autoFill ? "ON" : "OFF"} | ` +
+      `AUTO_FLOP=${state.autoRunFlop ? "ON" : "OFF"} | ` +
+      `TURN=${state.manualTurnOnly ? "MANUAL" : "FREE"} | ` +
+      `CLEAR_RIVER=${state.clearRiver ? "ON" : "OFF"}`;
+  }
+
+  function ensureControls() {
+    const textarea = findTextarea();
+    if (!textarea) return null;
+    if (document.getElementById("engine-flow-controls")) return textarea;
+
+    const wrap = document.createElement("div");
+    wrap.innerHTML = `
+      <div id="engine-flow-controls" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:10px;font-size:12px;">
+        <label><input type="checkbox" id="toggle-auto-fill"> Auto Fill</label>
+        <label><input type="checkbox" id="toggle-auto-flop"> Auto Run Flop</label>
+        <label><input type="checkbox" id="toggle-manual-turn"> Manual Turn Only</label>
+        <label><input type="checkbox" id="toggle-clear-river"> Clear River</label>
+        <span id="engine-flow-status" style="opacity:.8;"></span>
+      </div>
+    `;
+    textarea.parentNode.insertBefore(wrap.firstElementChild, textarea);
+
+    const state = loadState();
+
+    document.getElementById("toggle-auto-fill").checked = state.autoFill;
+    document.getElementById("toggle-auto-flop").checked = state.autoRunFlop;
+    document.getElementById("toggle-manual-turn").checked = state.manualTurnOnly;
+    document.getElementById("toggle-clear-river").checked = state.clearRiver;
+
+    ["toggle-auto-fill", "toggle-auto-flop", "toggle-manual-turn", "toggle-clear-river"].forEach(id => {
+      document.getElementById(id).addEventListener("change", () => {
+        const newState = {
+          autoFill: document.getElementById("toggle-auto-fill").checked,
+          autoRunFlop: document.getElementById("toggle-auto-flop").checked,
+          manualTurnOnly: document.getElementById("toggle-manual-turn").checked,
+          clearRiver: document.getElementById("toggle-clear-river").checked
+        };
+        saveState(newState);
+        updateStatus(newState);
+      });
+    });
+
+    updateStatus(state);
+    return textarea;
+  }
+
+  async function maybeAutoRun(text) {
+    const state = loadState();
+    
+    // Must be enabled
+    if (!state.autoRunFlop) return;
+    
+    // Prevent concurrent runs
+    if (isRunning) return;
+
+    const snapshotHash = hashSnapshot(text);
+    if (snapshotHash === lastSnapshotHash) return;
+
+    const players = extractPlayers(text);
+    const flop = extractFlop(text);
+
+    // 🔒 Guards
+    if (players.length < 6) {
+      console.log(`[AUTO] Skip: only ${players.length} players (need ≥6)`);
+      return;
+    }
+    if (!flop) return;
+    if (flop === lastFlop) {
+      console.log(`[AUTO] Skip: flop "${flop}" already processed`);
+      return;
+    }
+
+    // ✅ Lock state BEFORE run (prevents race)
+    lastFlop = flop;
+    lastSnapshotHash = snapshotHash;
+    isRunning = true;
+
+    try {
+      console.log(`[AUTO] Running equity on flop: "${flop}" (${players.length} players)`);
+      
+      const runBtn = findRunButton();
+      if (runBtn) {
+        runBtn.click();
+      } else {
+        console.warn("[AUTO] Run button not found");
+      }
+    } catch (e) {
+      console.error("[AUTO] Engine run failed:", e);
+    } finally {
+      setTimeout(() => {
+        isRunning = false;
+      }, 1000); // debounce window
+    }
+  }
+
+  function setTextareaValue(textarea, value) {
+    const nativeSetter = Object.getOwnPropertyDescriptor(
+      window.HTMLTextAreaElement.prototype,
+      "value"
+    ).set;
+
+    nativeSetter.call(textarea, value);
+    textarea.dispatchEvent(new Event("input", { bubbles: true }));
+    textarea.dispatchEvent(new Event("change", { bubbles: true }));
+  }
+
+  async function pollLatest() {
+    try {
+      const textarea = ensureControls();
+      if (!textarea) return;
+
+      const state = loadState();
+
+      const res = await fetch("/api/collector/latest", { credentials: "include" });
+      const data = await res.json();
+      
+      if (!data.ok) return;
+
+      const text = data.raw || "";
+
+      // 🔒 Snapshot guard: skip if data unchanged
+      if (text === lastSnapshotHash) {
+        adjustPollSpeed(); // Check if we should slow down
+        return;
+      }
+
+      // Data changed → update tracking
+      lastSnapshotHash = text;
+      lastDataChange = Date.now();
+
+      // Auto Fill
+      if (state.autoFill && text) {
+        setTextareaValue(textarea, text);
+      }
+
+      // 🔥 Smart trigger
+      await maybeAutoRun(text);
+
+      // Adaptive polling: speed up after activity
+      adjustPollSpeed();
+
+    } catch (err) {
+      console.error("[AUTO] Poll failed:", err);
+    }
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // ADAPTIVE POLLING: Fast when active, slow when idle
+  // ══════════════════════════════════════════════════════════════════════════
+
+  function adjustPollSpeed() {
+    const timeSinceChange = Date.now() - lastDataChange;
+    const shouldBeIdle = timeSinceChange > IDLE_THRESHOLD;
+    const targetInterval = shouldBeIdle ? SLOW_POLL : FAST_POLL;
+
+    if (targetInterval !== currentInterval) {
+      currentInterval = targetInterval;
+
+      // Restart polling with new interval
+      if (pollTimer) clearInterval(pollTimer);
+      pollTimer = setInterval(pollLatest, currentInterval);
+
+      const mode = shouldBeIdle ? 'IDLE' : 'ACTIVE';
+      console.log(`[AUTO] Poll speed adjusted: ${mode} (${currentInterval}ms)`);
+    }
+  }
+
+  function startAdaptivePolling() {
+    if (pollTimer) clearInterval(pollTimer);
+
+    pollTimer = setInterval(pollLatest, currentInterval);
+    console.log(`[AUTO] Adaptive polling started: ${currentInterval}ms (fast=${FAST_POLL}ms, slow=${SLOW_POLL}ms)`);
+
+    // Initial poll
+    pollLatest();
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // INITIALIZATION
+  // ══════════════════════════════════════════════════════════════════════════
+
+  ensureControls();
+
+  // Export for manual control
+  window.engineFlowPollLatest = pollLatest;
+  window.engineFlowMaybeAutoRun = maybeAutoRun;
+  window.engineFlowAdjustSpeed = adjustPollSpeed;
+
+  // Auto-start adaptive polling
+  startAdaptivePolling();
+  console.log('[AUTO] Smart trigger enabled: auto-run on flop (≥6 players)');
+})();

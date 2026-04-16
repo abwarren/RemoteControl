@@ -1,0 +1,22 @@
+Content-Type: text/x-zim-wiki
+Wiki-Format: zim 0.6
+Creation-Date: 2026-04-02T17:45:51+02:00
+
+poker after login 
+
+#root > div.layout-header-holder-bc > header > div.nav-content-bc > div > nav > ul.nav-menu.nav-menu-hide-items > li:nth-child(1) > a > [[span:nth-child(2)]]
+
+play 
+
+#root > div.layout-content-holder-bc > div:nth-child(2) > div > div > button > span
+
+scan PLO4 tables for MIlan click join 
+
+body > sg-app > div > sg-lobby > div > div > sg-table-category > div.lobby-wrapper > div.right-column-l-p > div.lobby-right-c > div > div > div > div > div > sg-cash-game-group-details > div > div.button-case > button
+
+join again .. body > sg-app > div > sg-lobby > div > div > sg-table-category > sg-modal > div > div > div > div > sg-join-multiple-tables > div > div.modal-button-container > ul > li:nth-child(1) > button
+
+
+BUY IN 
+
+body > sg-app > div > sg-lobby > div > div > sg-poker-table > sg-modal > div > div > div > div > sg-buy-in-modal > div > div > div.modal-button-container > ul > li:nth-child(1) > button

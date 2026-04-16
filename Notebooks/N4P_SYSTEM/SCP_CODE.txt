@@ -5,3 +5,30 @@ Creation-Date: 2026-04-01T09:02:13+02:00
 ====== SCP CODE ======
 Created Wednesday 01 April 2026
 
+mkdir -p ~/potlimitomaha-backup
+rsync -avz ubuntu@nuts4poker.com:/opt/plo-equity/ ~/potlimitomaha-backup/plo-equity/
+
+cd ~/potlimitomaha-backup/plo-equity
+
+cat > .gitignore << 'EOF'
+.env
+.streamlit/secrets.toml
+*.pem
+*.key
+__pycache__/
+*.pyc
+*.log
+*.sqlite3
+node_modules/
+venv/
+.venv/
+dist/
+build/
+EOF
+
+git init
+git add .
+git commit -m "Initial commit"
+git branch -M main
+git remote add origin https://github.com/abwarren/https://github.com/abwarren/ploequity
+git push -u origin main

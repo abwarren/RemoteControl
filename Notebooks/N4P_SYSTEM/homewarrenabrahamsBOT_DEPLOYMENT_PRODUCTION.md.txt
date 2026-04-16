@@ -1,0 +1,8 @@
+Content-Type: text/x-zim-wiki
+Wiki-Format: zim 0.6
+Creation-Date: 2026-04-03T02:11:40+02:00
+
+====== homewarrenabrahamsBOT DEPLOYMENT PRODUCTION.md ======
+Created Friday 03 April 2026
+
+   7 BOT_SCRIPT="/home/warrenabrahams/poker_bot_production.py"

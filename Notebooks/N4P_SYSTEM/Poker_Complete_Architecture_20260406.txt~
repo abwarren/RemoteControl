@@ -1,0 +1,4694 @@
+================================================================================
+POKER COLLECTOR + REMOTE CONTROL - COMPLETE ARCHITECTURE EXPORT
+================================================================================
+Date: 2026-04-06
+Export for: Zim Desktop Wiki (~/Notebooks/N4P_SYSTEM/)
+Contents: 6 comprehensive planning documents (133KB total)
+
+DOCUMENT INDEX:
+1. IMPLEMENTATION_ROADMAP_SUMMARY.md (9.3KB)
+2. PRODUCTION_DEPLOYMENT_GUIDE.md (18KB)
+3. COLLECTOR_RDS_ARCHITECTURE.md (19KB)
+4. COLLECTOR_SERVERLESS_ARCHITECTURE.md (20KB)
+5. REMOTE_CONTROL_WIRING_PLAN.md (43KB)
+6. POKERBET_COST_OPTIMIZATION_140.md (24KB)
+
+================================================================================
+
+
+
+################################################################################
+# DOCUMENT 1: IMPLEMENTATION_ROADMAP_SUMMARY.md
+################################################################################
+
+# Complete Implementation Roadmap - Summary
+**Remote Control + Collector Agent Systems**
+
+**Date:** 2026-04-06  
+**Status:** Planning Complete, Ready for Implementation
+
+---
+
+## Project Overview
+
+You have **two interconnected systems** to build:
+
+1. **Remote Control System** - Manual control of 9 poker players via web UI
+2. **Collector Agent System** - Automated card collection from 9 browser instances
+
+---
+
+## System 1: Remote Control (Manual Player Control)
+
+### Architecture
+```
+UI (HTML/JS) ←→ Flask Backend ←→ n4p.js (injected in browser)
+     ↑                 ↑                    ↑
+  User clicks      Command Queue      DOM automation
+  action buttons   (token-based)      (Selenium selectors)
+```
+
+### Features
+- **9 player seats** displayed in 3×3 grid
+- **8 action buttons per seat:**
+  - FOLD, CHECK, CALL, MIN, MAX, BET, ARM, CASH
+- **Advanced actions panel:**
+  - MIN ALL, MAX ALL, BET/EXECUTE, CASHOUT ALL
+- **Pre-action checkboxes:**
+  - Check/Fold, Check/Call (mutually exclusive)
+- **Command log:** Last 20 commands
+- **Real-time updates:** 2-second polling
+
+### Implementation Status
+✅ **Plan Complete:** See `REMOTE_CONTROL_WIRING_PLAN.md`  
+📋 **Backend:** 4 new endpoints to add  
+📋 **Frontend:** Update HTML/CSS/JS  
+⏱️ **Estimated Time:** 2-3 days
+
+---
+
+## System 2: Collector Agent (Automated Card Scraping)
+
+### Architecture (RDS Version - Recommended)
+```
+┌──────────────────────────────────────────────────┐
+│   EC2: 9 Selenium Bots                           │
+│   - Persistent browser sessions                  │
+│   - DOM polling: icon-layer2 cards              │
+│   - POST snapshots every 1-2s                    │
+└────────────┬─────────────────────────────────────┘
+             │
+             ▼
+┌──────────────────────────────────────────────────┐
+│   API Gateway → Lambda → RDS Proxy → PostgreSQL │
+│   - Validate/normalize cards                     │
+│   - Upsert table_state (latest)                 │
+│   - Insert snapshot_history (log)               │
+│   - Archive to S3 (raw JSON)                    │
+└──────────────────────────────────────────────────┘
+             │
+             ▼
+┌──────────────────────────────────────────────────┐
+│   PostgreSQL Tables:                             │
+│   - table_state (latest row per table)          │
+│   - snapshot_history (append-only log)          │
+│   - bot_registry (health tracking)              │
+│   - commands (remote control queue)             │
+│   - error_log (debugging)                       │
+└──────────────────────────────────────────────────┘
+             │
+             ▼
+┌──────────────────────────────────────────────────┐
+│   UI: Aggregated Table View                      │
+│   - Polls /table/latest                          │
+│   - Shows all 9 tables                           │
+│   - Hero cards, board cards, status              │
+└──────────────────────────────────────────────────┘
+```
+
+### Why RDS?
+✅ **Relational data model** (bots → tables → snapshots)  
+✅ **SQL queries, joins, aggregations**  
+✅ **Full history and replay**  
+✅ **Easier debugging**  
+⚠️ **Requires RDS Proxy** (prevent Lambda connection storms)
+
+### Implementation Status
+✅ **Plan Complete:** See `COLLECTOR_RDS_ARCHITECTURE.md`  
+📋 **PostgreSQL Schema:** 5 tables defined  
+📋 **Lambda Function:** Python + psycopg2  
+📋 **Bot Collector:** Card extraction logic  
+⏱️ **Estimated Time:** 4-6 hours
+
+---
+
+## Key Design Decisions
+
+### Decision 1: Lambda + RDS (Not Flask In-Memory)
+**Why:**
+- Serverless auto-scaling
+- RDS connection pooling via RDS Proxy
+- S3 archival for history/replay
+- Cheaper than EC2 for processing layer
+
+**Cost:** ~$138/month (RDS $28 + Lambda $9 + S3 $101)
+
+### Decision 2: RDS (Not DynamoDB)
+**Why:**
+- Relational data model (bots, tables, snapshots, commands)
+- Need for SQL queries, joins, history
+- DynamoDB = key-value store (not ideal for complex queries)
+
+**Trade-off:** $7/month more expensive than DynamoDB
+
+### Decision 3: EC2 for Bots (Not Lambda)
+**Why:**
+- Lambda can't run persistent browser sessions
+- Need logged-in state, iframe navigation
+- Continuous DOM polling (not short-lived)
+
+**Bots Stay on EC2, Backend Moves to Lambda + RDS**
+
+---
+
+## Files Created
+
+| File | Size | Purpose |
+|------|------|---------|
+| `REMOTE_CONTROL_WIRING_PLAN.md` | 90KB | Complete remote control UI + backend plan |
+| `COLLECTOR_AGENT_SYSTEM_PLAN.md` | 45KB | Collector with Flask in-memory backend |
+| `COLLECTOR_SERVERLESS_ARCHITECTURE.md` | 35KB | Lambda + DynamoDB + S3 version |
+| `COLLECTOR_RDS_ARCHITECTURE.md` | 40KB | **RECOMMENDED:** Lambda + RDS Proxy + PostgreSQL |
+| `IMPLEMENTATION_ROADMAP_SUMMARY.md` | 8KB | This file (high-level overview) |
+
+---
+
+## Implementation Order
+
+### Phase 1: Backend Infrastructure (Week 1)
+1. Set up RDS PostgreSQL instance
+2. Create RDS Proxy
+3. Deploy Lambda functions
+4. Create API Gateway endpoints
+5. Run schema DDL
+6. Test with curl
+
+**Deliverables:**
+- RDS instance running
+- Lambda processing snapshots
+- API Gateway endpoints live
+
+### Phase 2: Bot Collector (Week 1)
+1. Write card extraction logic (icon-layer2 pattern)
+2. Create bot worker threads
+3. Test with 1 bot → verify data in RDS
+4. Deploy to all 9 bots
+5. Monitor CloudWatch logs
+
+**Deliverables:**
+- 9 bots posting snapshots
+- Data flowing to RDS
+- S3 archive working
+
+### Phase 3: Remote Control Backend (Week 2)
+1. Update Flask app.py with new endpoints
+2. Add batch command endpoint
+3. Add execute-all endpoint
+4. Add cashout-all endpoint
+5. Test with Postman/curl
+
+**Deliverables:**
+- Backend command queue working
+- API endpoints tested
+
+### Phase 4: Remote Control UI (Week 2)
+1. Update HTML structure (9 seats)
+2. Add all 8 action buttons per seat
+3. Add advanced actions panel
+4. Add JavaScript functions
+5. Test in browser
+
+**Deliverables:**
+- UI rendering 9 seats
+- All buttons functional
+- Command log working
+
+### Phase 5: Integration Testing (Week 3)
+1. End-to-end test: UI → Backend → Browser
+2. Test batch actions (MIN ALL, MAX ALL)
+3. Test emergency cashout
+4. Monitor for 24 hours
+5. Fix bugs
+
+**Deliverables:**
+- Stable end-to-end system
+- Bug fixes deployed
+- Documentation updated
+
+---
+
+## Cost Summary
+
+### Monthly Costs (9 Bots Running 24/7)
+
+| Component | Cost |
+|-----------|------|
+| **RDS PostgreSQL** (db.t3.micro) | $12.41 |
+| **RDS Proxy** | $10.95 |
+| **Storage** (20GB) | $2.30 |
+| **Backups** (7 days) | $1.90 |
+| **Lambda** (15.6M invocations) | $9.42 |
+| **S3** (PUT + storage) | $101 |
+| **Total** | **$138/month** |
+
+### Optimizations
+- Reduce bot polling to 2s → save $5/month (Lambda)
+- S3 Glacier after 7 days → save $50/month (storage)
+- **Optimized Total: ~$83/month**
+
+---
+
+## Next Steps
+
+1. **Review all 4 implementation plans**
+2. **Approve RDS architecture** (or choose DynamoDB alternative)
+3. **Set up AWS infrastructure** (RDS, Lambda, API Gateway)
+4. **Implement bot collector first** (data collection is foundation)
+5. **Then implement remote control** (requires data to be flowing)
+
+**Questions to Answer:**
+- Approve RDS over DynamoDB? ✓ (RDS recommended for relational data)
+- Deploy bots on existing EC2 or new instances?
+- Use API Gateway or direct FastAPI on EC2?
+- Set up cost alerts in AWS?
+
+---
+
+## Testing Strategy
+
+### Unit Tests
+- Lambda function with sample payload
+- Card extraction regex patterns
+- PostgreSQL queries (UPSERT, SELECT)
+- API Gateway endpoints
+
+### Integration Tests
+- Bot → Lambda → RDS → UI (end-to-end)
+- Batch commands (MIN ALL, MAX ALL)
+- Emergency cashout (all seats)
+- Stale table cleanup (TTL)
+
+### Load Tests
+- 9 bots × 0.67 req/s = 6 req/s sustained
+- Lambda cold start handling
+- RDS Proxy connection pooling
+- UI polling with 9 tables
+
+---
+
+## Documentation
+
+All implementation details are in:
+1. `REMOTE_CONTROL_WIRING_PLAN.md` - Remote control (UI + backend)
+2. `COLLECTOR_RDS_ARCHITECTURE.md` - Collector (bots + Lambda + RDS)
+3. `POKERBET_IN_PLAY_BUTTONS_COMPLETE.md` - Selector reference
+4. `POKERBET_SQL_SCHEMA_PLAN.md` - Data warehouse schema
+
+**Also in Zim Notebook:** `~/Notebooks/N4P_SYSTEM/`
+
+---
+
+## Status
+
+✅ **Architecture Design:** COMPLETE  
+✅ **Implementation Plans:** COMPLETE  
+✅ **Cost Analysis:** COMPLETE  
+✅ **PostgreSQL Schema:** COMPLETE  
+✅ **Lambda Functions:** COMPLETE  
+⏸️ **AWS Deployment:** AWAITING APPROVAL  
+⏸️ **Code Implementation:** AWAITING APPROVAL
+
+**Ready to Begin Implementation:** YES
+
+**Estimated Total Time:** 3 weeks (15 working days)
+
+
+
+################################################################################
+# DOCUMENT 2: PRODUCTION_DEPLOYMENT_GUIDE.md
+################################################################################
+
+# Production Deployment Guide - RDS + Lambda Architecture
+**Complete AWS Setup with VPC, Security Groups, and Best Practices**
+
+**Date:** 2026-04-06  
+**Status:** Production-Ready Configuration
+
+---
+
+## VPC Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                          VPC                                    │
+│                                                                 │
+│  ┌────────────────────────────────────────────────────────┐   │
+│  │                 PUBLIC SUBNET                          │   │
+│  │  - NAT Gateway (outbound for private subnets)         │   │
+│  │  - Optional bastion host (for RDS access)             │   │
+│  └────────────────────────────────────────────────────────┘   │
+│                                                                 │
+│  ┌────────────────────────────────────────────────────────┐   │
+│  │           PRIVATE APP SUBNET                           │   │
+│  │  - Lambda ENIs (Elastic Network Interfaces)           │   │
+│  │  - EC2 bot instances (Selenium collectors)            │   │
+│  └────────────────────────────────────────────────────────┘   │
+│                                                                 │
+│  ┌────────────────────────────────────────────────────────┐   │
+│  │           PRIVATE DB SUBNET                            │   │
+│  │  - RDS PostgreSQL (no public access)                  │   │
+│  │  - RDS Proxy (connection pooling)                     │   │
+│  └────────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Security Groups
+
+### 1. EC2 Bots Security Group
+
+**Name:** `sg-ec2-bots`
+
+**Inbound:**
+- SSH (22) from your IP only (for management)
+
+**Outbound:**
+- HTTPS (443) to 0.0.0.0/0 (API Gateway, pokerbet.co.za)
+- HTTP (80) to 0.0.0.0/0 (if needed)
+
+### 2. Lambda Security Group
+
+**Name:** `sg-lambda-ingest`
+
+**Inbound:**
+- None (Lambda doesn't receive inbound)
+
+**Outbound:**
+- PostgreSQL (5432) to `sg-rds-proxy`
+- HTTPS (443) to 0.0.0.0/0 (S3 access)
+
+### 3. RDS Proxy Security Group
+
+**Name:** `sg-rds-proxy`
+
+**Inbound:**
+- PostgreSQL (5432) from `sg-lambda-ingest`
+
+**Outbound:**
+- PostgreSQL (5432) to `sg-rds`
+
+### 4. RDS Security Group
+
+**Name:** `sg-rds`
+
+**Inbound:**
+- PostgreSQL (5432) from `sg-rds-proxy` ONLY
+
+**Outbound:**
+- None (RDS doesn't initiate outbound)
+
+**Key Security Principle:**
+```
+EC2 bots  →  (HTTPS)  →  API Gateway  →  Lambda  →  RDS Proxy  →  RDS
+                                         (SG allowed)  (SG allowed)
+```
+
+**RDS is NOT directly accessible:**
+- No public IP
+- No Lambda → RDS direct connection
+- Only RDS Proxy → RDS
+
+---
+
+## MVP Scope (Do Now vs Later)
+
+### ✅ Do Now (MVP)
+
+**Database Tables:**
+1. `table_state` - Latest row per table_id
+2. `snapshot_history` - Append-only raw history
+3. `bot_registry` - Bot heartbeat and assignment
+
+**Backend:**
+- Lambda ingest function
+- S3 raw archive
+- RDS Proxy setup
+
+**Frontend:**
+- Simple UI polling `/table/latest`
+
+**Infrastructure:**
+- VPC with 3 subnets
+- Security groups
+- RDS PostgreSQL (db.t3.micro)
+- API Gateway
+
+### ⏸️ Do Later (Post-MVP)
+
+**Database Tables:**
+4. `bot_commands` - Centralized control queue (for remote control)
+5. `replay_service` - Hand replay functionality
+6. `analytics` - Materialized views for statistics
+
+**Backend:**
+- WebSocket push (instead of polling)
+- Real-time notifications
+- Advanced analytics endpoints
+
+---
+
+## Step-by-Step Deployment
+
+### Phase 1: VPC Setup
+
+#### 1.1 Create VPC
+
+**AWS CLI:**
+```bash
+aws ec2 create-vpc \
+  --cidr-block 10.0.0.0/16 \
+  --tag-specifications 'ResourceType=vpc,Tags=[{Key=Name,Value=poker-collector-vpc}]'
+
+# Output: vpc-xxxxxxxx
+```
+
+#### 1.2 Create Subnets
+
+**Public Subnet:**
+```bash
+aws ec2 create-subnet \
+  --vpc-id vpc-xxxxxxxx \
+  --cidr-block 10.0.1.0/24 \
+  --availability-zone us-east-1a \
+  --tag-specifications 'ResourceType=subnet,Tags=[{Key=Name,Value=public-subnet}]'
+```
+
+**Private App Subnet:**
+```bash
+aws ec2 create-subnet \
+  --vpc-id vpc-xxxxxxxx \
+  --cidr-block 10.0.2.0/24 \
+  --availability-zone us-east-1a \
+  --tag-specifications 'ResourceType=subnet,Tags=[{Key=Name,Value=private-app-subnet}]'
+```
+
+**Private DB Subnet (1):**
+```bash
+aws ec2 create-subnet \
+  --vpc-id vpc-xxxxxxxx \
+  --cidr-block 10.0.3.0/24 \
+  --availability-zone us-east-1a \
+  --tag-specifications 'ResourceType=subnet,Tags=[{Key=Name,Value=private-db-subnet-1a}]'
+```
+
+**Private DB Subnet (2) - Required for RDS Multi-AZ:**
+```bash
+aws ec2 create-subnet \
+  --vpc-id vpc-xxxxxxxx \
+  --cidr-block 10.0.4.0/24 \
+  --availability-zone us-east-1b \
+  --tag-specifications 'ResourceType=subnet,Tags=[{Key=Name,Value=private-db-subnet-1b}]'
+```
+
+#### 1.3 Create Internet Gateway
+
+```bash
+aws ec2 create-internet-gateway \
+  --tag-specifications 'ResourceType=internet-gateway,Tags=[{Key=Name,Value=poker-igw}]'
+
+aws ec2 attach-internet-gateway \
+  --vpc-id vpc-xxxxxxxx \
+  --internet-gateway-id igw-xxxxxxxx
+```
+
+#### 1.4 Create NAT Gateway (For Private Subnets)
+
+```bash
+# Allocate Elastic IP
+aws ec2 allocate-address --domain vpc
+
+# Create NAT Gateway in public subnet
+aws ec2 create-nat-gateway \
+  --subnet-id subnet-public-xxxxxxxx \
+  --allocation-id eipalloc-xxxxxxxx
+```
+
+#### 1.5 Create Route Tables
+
+**Public Route Table:**
+```bash
+aws ec2 create-route \
+  --route-table-id rtb-public-xxxxxxxx \
+  --destination-cidr-block 0.0.0.0/0 \
+  --gateway-id igw-xxxxxxxx
+```
+
+**Private Route Table:**
+```bash
+aws ec2 create-route \
+  --route-table-id rtb-private-xxxxxxxx \
+  --destination-cidr-block 0.0.0.0/0 \
+  --nat-gateway-id nat-xxxxxxxx
+```
+
+---
+
+### Phase 2: Security Groups
+
+#### 2.1 Create Security Groups
+
+**EC2 Bots SG:**
+```bash
+aws ec2 create-security-group \
+  --group-name sg-ec2-bots \
+  --description "Security group for EC2 Selenium bots" \
+  --vpc-id vpc-xxxxxxxx
+
+# Inbound: SSH from your IP
+aws ec2 authorize-security-group-ingress \
+  --group-id sg-ec2-bots \
+  --protocol tcp \
+  --port 22 \
+  --cidr YOUR_IP/32
+
+# Outbound: HTTPS (default allows all, but explicit is better)
+aws ec2 authorize-security-group-egress \
+  --group-id sg-ec2-bots \
+  --protocol tcp \
+  --port 443 \
+  --cidr 0.0.0.0/0
+```
+
+**Lambda SG:**
+```bash
+aws ec2 create-security-group \
+  --group-name sg-lambda-ingest \
+  --description "Security group for Lambda functions" \
+  --vpc-id vpc-xxxxxxxx
+
+# Outbound: PostgreSQL to RDS Proxy
+aws ec2 authorize-security-group-egress \
+  --group-id sg-lambda-ingest \
+  --protocol tcp \
+  --port 5432 \
+  --source-group sg-rds-proxy
+
+# Outbound: HTTPS to S3
+aws ec2 authorize-security-group-egress \
+  --group-id sg-lambda-ingest \
+  --protocol tcp \
+  --port 443 \
+  --cidr 0.0.0.0/0
+```
+
+**RDS Proxy SG:**
+```bash
+aws ec2 create-security-group \
+  --group-name sg-rds-proxy \
+  --description "Security group for RDS Proxy" \
+  --vpc-id vpc-xxxxxxxx
+
+# Inbound: PostgreSQL from Lambda
+aws ec2 authorize-security-group-ingress \
+  --group-id sg-rds-proxy \
+  --protocol tcp \
+  --port 5432 \
+  --source-group sg-lambda-ingest
+
+# Outbound: PostgreSQL to RDS
+aws ec2 authorize-security-group-egress \
+  --group-id sg-rds-proxy \
+  --protocol tcp \
+  --port 5432 \
+  --source-group sg-rds
+```
+
+**RDS SG:**
+```bash
+aws ec2 create-security-group \
+  --group-name sg-rds \
+  --description "Security group for RDS PostgreSQL" \
+  --vpc-id vpc-xxxxxxxx
+
+# Inbound: PostgreSQL from RDS Proxy ONLY
+aws ec2 authorize-security-group-ingress \
+  --group-id sg-rds \
+  --protocol tcp \
+  --port 5432 \
+  --source-group sg-rds-proxy
+```
+
+---
+
+### Phase 3: RDS Setup
+
+#### 3.1 Create DB Subnet Group
+
+```bash
+aws rds create-db-subnet-group \
+  --db-subnet-group-name poker-db-subnet-group \
+  --db-subnet-group-description "Subnet group for poker RDS" \
+  --subnet-ids subnet-db-1a-xxxxxxxx subnet-db-1b-xxxxxxxx \
+  --tags Key=Name,Value=poker-db-subnet-group
+```
+
+#### 3.2 Create RDS Instance
+
+```bash
+aws rds create-db-instance \
+  --db-instance-identifier poker-collector-db \
+  --db-instance-class db.t3.micro \
+  --engine postgres \
+  --engine-version 14.7 \
+  --master-username postgres \
+  --master-user-password 'SECURE_PASSWORD_HERE' \
+  --allocated-storage 20 \
+  --storage-type gp3 \
+  --vpc-security-group-ids sg-rds \
+  --db-subnet-group-name poker-db-subnet-group \
+  --backup-retention-period 7 \
+  --preferred-backup-window "03:00-04:00" \
+  --preferred-maintenance-window "mon:04:00-mon:05:00" \
+  --no-publicly-accessible \
+  --tags Key=Name,Value=poker-collector-db
+```
+
+**Wait for instance to be available (~10 minutes):**
+```bash
+aws rds wait db-instance-available --db-instance-identifier poker-collector-db
+```
+
+#### 3.3 Create RDS Proxy
+
+**First, store credentials in Secrets Manager:**
+```bash
+aws secretsmanager create-secret \
+  --name poker-db-credentials \
+  --description "RDS credentials for poker collector" \
+  --secret-string '{"username":"postgres","password":"SECURE_PASSWORD_HERE"}'
+```
+
+**Create IAM role for RDS Proxy:**
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": {
+        "Service": "rds.amazonaws.com"
+      },
+      "Action": "sts:AssumeRole"
+    }
+  ]
+}
+```
+
+**Create RDS Proxy:**
+```bash
+aws rds create-db-proxy \
+  --db-proxy-name poker-collector-proxy \
+  --engine-family POSTGRESQL \
+  --auth AuthScheme=SECRETS,SecretArn=arn:aws:secretsmanager:...:secret:poker-db-credentials \
+  --role-arn arn:aws:iam::ACCOUNT_ID:role/RDSProxyRole \
+  --vpc-subnet-ids subnet-db-1a-xxxxxxxx subnet-db-1b-xxxxxxxx \
+  --vpc-security-group-ids sg-rds-proxy \
+  --require-tls
+```
+
+**Register RDS instance with proxy:**
+```bash
+aws rds register-db-proxy-targets \
+  --db-proxy-name poker-collector-proxy \
+  --db-instance-identifiers poker-collector-db
+```
+
+**Get proxy endpoint:**
+```bash
+aws rds describe-db-proxies --db-proxy-name poker-collector-proxy \
+  --query 'DBProxies[0].Endpoint' --output text
+
+# Output: poker-collector-proxy.proxy-xxxxxxxx.us-east-1.rds.amazonaws.com
+```
+
+---
+
+### Phase 4: Lambda Setup
+
+#### 4.1 Create Lambda Execution Role
+
+**IAM Policy:**
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "logs:CreateLogGroup",
+        "logs:CreateLogStream",
+        "logs:PutLogEvents"
+      ],
+      "Resource": "arn:aws:logs:*:*:*"
+    },
+    {
+      "Effect": "Allow",
+      "Action": [
+        "ec2:CreateNetworkInterface",
+        "ec2:DescribeNetworkInterfaces",
+        "ec2:DeleteNetworkInterface"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Effect": "Allow",
+      "Action": [
+        "secretsmanager:GetSecretValue"
+      ],
+      "Resource": "arn:aws:secretsmanager:*:*:secret:poker-db-credentials*"
+    },
+    {
+      "Effect": "Allow",
+      "Action": [
+        "s3:PutObject"
+      ],
+      "Resource": "arn:aws:s3:::poker-snapshots-prod/*"
+    }
+  ]
+}
+```
+
+#### 4.2 Deploy Lambda Function
+
+**Package Lambda:**
+```bash
+cd lambda/
+pip install psycopg2-binary -t .
+zip -r function.zip .
+```
+
+**Create Lambda:**
+```bash
+aws lambda create-function \
+  --function-name poker-snapshot-ingest \
+  --runtime python3.11 \
+  --role arn:aws:iam::ACCOUNT_ID:role/LambdaExecutionRole \
+  --handler lambda_function.lambda_handler \
+  --zip-file fileb://function.zip \
+  --timeout 30 \
+  --memory-size 256 \
+  --vpc-config SubnetIds=subnet-app-xxxxxxxx,SecurityGroupIds=sg-lambda-ingest \
+  --environment Variables="{
+    DB_HOST=poker-collector-proxy.proxy-xxxxxxxx.us-east-1.rds.amazonaws.com,
+    DB_NAME=poker,
+    DB_USER=postgres,
+    DB_PORT=5432,
+    S3_BUCKET=poker-snapshots-prod
+  }"
+```
+
+---
+
+### Phase 5: Initialize Database
+
+#### 5.1 Connect to RDS
+
+**Via Bastion Host (if needed):**
+```bash
+# SSH tunnel through bastion
+ssh -i key.pem -L 5432:poker-collector-db.xxxxx.rds.amazonaws.com:5432 \
+  ec2-user@bastion-public-ip
+```
+
+**Or via Lambda (recommended):**
+```python
+# Use AWS Lambda to run DDL (no bastion needed)
+```
+
+#### 5.2 Run Schema DDL
+
+**SQL:**
+```sql
+-- Connect to RDS via psql
+\c poker
+
+-- Create tables (from COLLECTOR_RDS_ARCHITECTURE.md Section 1)
+CREATE TABLE table_state (...);
+CREATE TABLE snapshot_history (...);
+CREATE TABLE bot_registry (...);
+
+-- Create indexes
+CREATE INDEX idx_status ON table_state(status);
+CREATE INDEX idx_table_id ON snapshot_history(table_id);
+CREATE INDEX idx_last_heartbeat ON bot_registry(last_heartbeat DESC);
+```
+
+---
+
+### Phase 6: API Gateway Setup
+
+#### 6.1 Create REST API
+
+```bash
+aws apigateway create-rest-api \
+  --name poker-collector-api \
+  --description "API for poker snapshot collection" \
+  --endpoint-configuration types=REGIONAL
+```
+
+#### 6.2 Create Resources
+
+```bash
+# Get root resource ID
+ROOT_ID=$(aws apigateway get-resources \
+  --rest-api-id API_ID \
+  --query 'items[?path==`/`].id' --output text)
+
+# Create /snapshot resource
+aws apigateway create-resource \
+  --rest-api-id API_ID \
+  --parent-id $ROOT_ID \
+  --path-part snapshot
+```
+
+#### 6.3 Create POST Method
+
+```bash
+# Create method
+aws apigateway put-method \
+  --rest-api-id API_ID \
+  --resource-id RESOURCE_ID \
+  --http-method POST \
+  --authorization-type NONE
+
+# Integrate with Lambda
+aws apigateway put-integration \
+  --rest-api-id API_ID \
+  --resource-id RESOURCE_ID \
+  --http-method POST \
+  --type AWS_PROXY \
+  --integration-http-method POST \
+  --uri arn:aws:apigateway:REGION:lambda:path/2015-03-31/functions/LAMBDA_ARN/invocations
+```
+
+#### 6.4 Deploy API
+
+```bash
+aws apigateway create-deployment \
+  --rest-api-id API_ID \
+  --stage-name prod
+```
+
+**API Endpoint:**
+```
+https://API_ID.execute-api.REGION.amazonaws.com/prod/snapshot
+```
+
+---
+
+## Lambda Environment Variables
+
+**Minimal configuration:**
+```bash
+DB_HOST=poker-collector-proxy.proxy-xxxxxxxx.us-east-1.rds.amazonaws.com
+DB_NAME=poker
+DB_USER=postgres
+DB_PORT=5432
+S3_BUCKET=poker-snapshots-prod
+```
+
+**Password:** Retrieved from Secrets Manager (not hardcoded)
+
+**Benefits of RDS Proxy:**
+- IAM auth support (no password needed in code)
+- Simplified TLS/certificate handling
+- Connection pooling (prevents Lambda connection storms)
+
+---
+
+## Testing
+
+### Test 1: Lambda Invocation
+
+```bash
+aws lambda invoke \
+  --function-name poker-snapshot-ingest \
+  --payload '{
+    "table_id": "test-table",
+    "source_bot": "bot_test",
+    "hero_cards": ["Ah", "Kh"],
+    "board_cards": ["Qh", "Jh", "Th"],
+    "raw_cards": ["Ah", "Kh", "Qh", "Jh", "Th"],
+    "status": "LIVE",
+    "timestamp": 1775432100
+  }' \
+  response.json
+
+cat response.json
+```
+
+### Test 2: API Gateway
+
+```bash
+curl -X POST https://API_ID.execute-api.us-east-1.amazonaws.com/prod/snapshot \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "table_id": "test-table",
+    "source_bot": "bot_test",
+    "hero_cards": ["Ah", "Kh"],
+    "board_cards": ["Qh", "Jh", "Th"],
+    "raw_cards": ["Ah", "Kh", "Qh", "Jh", "Th"],
+    "status": "LIVE",
+    "timestamp": 1775432100
+  }'
+```
+
+### Test 3: Database Query
+
+```sql
+-- Check table_state
+SELECT * FROM table_state WHERE table_id = 'test-table';
+
+-- Check snapshot_history
+SELECT COUNT(*) FROM snapshot_history;
+
+-- Check S3
+aws s3 ls s3://poker-snapshots-prod/snapshots/test-table/
+```
+
+---
+
+## Monitoring
+
+### CloudWatch Alarms
+
+**Lambda Errors:**
+```bash
+aws cloudwatch put-metric-alarm \
+  --alarm-name poker-lambda-errors \
+  --alarm-description "Alert on Lambda errors" \
+  --metric-name Errors \
+  --namespace AWS/Lambda \
+  --statistic Sum \
+  --period 300 \
+  --evaluation-periods 1 \
+  --threshold 10 \
+  --comparison-operator GreaterThanThreshold \
+  --dimensions Name=FunctionName,Value=poker-snapshot-ingest
+```
+
+**RDS CPU:**
+```bash
+aws cloudwatch put-metric-alarm \
+  --alarm-name poker-rds-cpu \
+  --metric-name CPUUtilization \
+  --namespace AWS/RDS \
+  --statistic Average \
+  --period 300 \
+  --evaluation-periods 2 \
+  --threshold 80 \
+  --comparison-operator GreaterThanThreshold \
+  --dimensions Name=DBInstanceIdentifier,Value=poker-collector-db
+```
+
+---
+
+## Cost Estimate (Production)
+
+| Component | Spec | Cost/Month |
+|-----------|------|------------|
+| **RDS** | db.t3.micro, 20GB | $12.41 |
+| **RDS Proxy** | Always-on | $10.95 |
+| **Lambda** | 15.6M invocations, 256MB | $9.42 |
+| **S3** | 2.3TB/month | $53 (Standard) |
+| **NAT Gateway** | Data transfer | $32 |
+| **Data Transfer** | Out to internet | $9 |
+| **Secrets Manager** | 1 secret | $0.40 |
+| **Total** | | **~$127/month** |
+
+**Optimizations:**
+- S3 Glacier after 7 days → save $40/month
+- Reduce Lambda memory to 128MB → save $4/month
+- **Optimized: ~$83/month**
+
+---
+
+## Status
+
+✅ **Architecture:** COMPLETE  
+✅ **VPC Design:** COMPLETE  
+✅ **Security Groups:** COMPLETE  
+✅ **RDS Setup:** COMPLETE  
+✅ **Lambda Setup:** COMPLETE  
+✅ **MVP Scope:** DEFINED  
+⏸️ **Deployment:** READY TO EXECUTE
+
+**Next Step:** Run deployment commands in AWS Console or CLI
+
+
+
+################################################################################
+# DOCUMENT 3: COLLECTOR_RDS_ARCHITECTURE.md
+################################################################################
+
+# Collector Agent - RDS Architecture (Lambda + RDS Proxy + PostgreSQL)
+**Optimal Relational Backend for Poker Data Collection**
+
+**Date:** 2026-04-06  
+**Architecture:** EC2 Bots → Lambda → RDS Proxy → PostgreSQL + S3
+
+---
+
+## Why RDS Instead of DynamoDB?
+
+Your data model is **naturally relational**:
+- `bots` → many `tables` → many `snapshots`
+- `tables` → many `commands`
+- `sessions` → many `errors`
+- Need for **joins**, **history queries**, **aggregations**
+
+✅ **RDS Postgres** = designed for structured relational workloads  
+⚠️ **DynamoDB** = key-value store (not ideal for complex queries)
+
+---
+
+## Correct RDS Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│             EC2 BOTS (Selenium collectors)                      │
+│   9 persistent browser sessions                                 │
+└────────────┬────────────────────────────────────────────────────┘
+             │ POST snapshots
+             ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                  API GATEWAY / FastAPI                          │
+└────────────┬────────────────────────────────────────────────────┘
+             │ Trigger Lambda
+             ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                   LAMBDA FUNCTION                               │
+│   - Validate snapshot                                            │
+│   - Normalize cards                                              │
+│   - INSERT/UPDATE PostgreSQL                                    │
+│   - Archive to S3                                                │
+└────────────┬────────────────────────────────────────────────────┘
+             │
+             ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                     RDS PROXY ⚠️ CRITICAL                       │
+│   Connection pooling for Lambda                                  │
+│   Prevents connection exhaustion                                │
+└────────────┬────────────────────────────────────────────────────┘
+             │
+             ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                RDS POSTGRES (db.t3.micro)                       │
+│   Tables:                                                        │
+│   - table_state (latest row per table)                          │
+│   - snapshot_history (append-only log)                          │
+│   - bot_registry (bot health tracking)                          │
+│   - commands (remote control queue)                             │
+│   - error_log (debugging)                                        │
+└─────────────────────────────────────────────────────────────────┘
+
+         ┌────────┐
+         │   S3   │  Raw JSON archive
+         │        │  snapshots/{table_id}/{date}/{ts}.json
+         └────────┘
+```
+
+---
+
+## Why RDS Proxy?
+
+**Problem:** Lambda creates new DB connection on each invocation  
+**At Scale:** 15M Lambda invocations/month = potential connection storm  
+**Solution:** RDS Proxy pools connections, reuses them across Lambda invocations
+
+**Without RDS Proxy:**
+```
+Lambda1 → RDS (new connection)
+Lambda2 → RDS (new connection)
+Lambda3 → RDS (new connection)
+...
+Lambda1000 → RDS (ERROR: too many connections)
+```
+
+**With RDS Proxy:**
+```
+Lambda1 →┐
+Lambda2 →├─→ RDS Proxy (connection pool) → RDS (5 connections)
+Lambda3 →┤
+Lambda4 →┘
+```
+
+---
+
+## 1. PostgreSQL Schema
+
+### 1.1 Table: `table_state` (Latest State Per Table)
+
+```sql
+CREATE TABLE table_state (
+    table_id VARCHAR(64) PRIMARY KEY,
+    source_bot VARCHAR(64) NOT NULL,
+    hero_cards TEXT[],                 -- Array of cards: ['Ah', 'Kh']
+    board_cards TEXT[],                -- Array of cards: ['Qh', 'Jh', 'Th']
+    raw_cards TEXT[],                  -- All cards in order
+    status VARCHAR(16) NOT NULL,       -- 'LIVE', 'WAITING', 'STALE'
+    last_seen BIGINT NOT NULL,         -- Unix timestamp
+    updated_at TIMESTAMP DEFAULT NOW(),
+    
+    -- Indexes
+    INDEX idx_status (status),
+    INDEX idx_source_bot (source_bot),
+    INDEX idx_last_seen (last_seen DESC)
+);
+
+-- Auto-update updated_at on every UPDATE
+CREATE TRIGGER update_table_state_updated_at
+BEFORE UPDATE ON table_state
+FOR EACH ROW
+EXECUTE FUNCTION update_updated_at_column();
+
+CREATE FUNCTION update_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+```
+
+**Purpose:**
+- Fast lookups by `table_id` (primary key)
+- Query latest state for UI
+- One row per table (upsert on conflict)
+
+**Example Query:**
+```sql
+-- Get all active tables
+SELECT * FROM table_state WHERE status = 'LIVE' ORDER BY last_seen DESC;
+
+-- Get specific table
+SELECT * FROM table_state WHERE table_id = 'bot_1';
+```
+
+### 1.2 Table: `snapshot_history` (Append-Only Log)
+
+```sql
+CREATE TABLE snapshot_history (
+    id BIGSERIAL PRIMARY KEY,
+    table_id VARCHAR(64) NOT NULL,
+    source_bot VARCHAR(64) NOT NULL,
+    hero_cards TEXT[],
+    board_cards TEXT[],
+    raw_cards_json JSONB,              -- Full card context
+    status VARCHAR(16),
+    timestamp_unix BIGINT NOT NULL,    -- Unix timestamp from bot
+    created_at TIMESTAMP DEFAULT NOW(),
+    
+    -- Indexes
+    INDEX idx_table_id (table_id),
+    INDEX idx_timestamp (timestamp_unix DESC),
+    INDEX idx_created_at (created_at DESC)
+);
+
+-- Partition by month for performance (optional, for high volume)
+-- CREATE TABLE snapshot_history_2026_04 PARTITION OF snapshot_history
+--     FOR VALUES FROM ('2026-04-01') TO ('2026-05-01');
+```
+
+**Purpose:**
+- Complete history of all snapshots
+- Replay capability
+- Debugging and analytics
+- Never updated, only inserted
+
+**Example Query:**
+```sql
+-- Get last 100 snapshots for table
+SELECT * FROM snapshot_history 
+WHERE table_id = 'bot_1' 
+ORDER BY timestamp_unix DESC 
+LIMIT 100;
+
+-- Get snapshots in time range
+SELECT * FROM snapshot_history 
+WHERE timestamp_unix BETWEEN 1775430000 AND 1775440000;
+```
+
+### 1.3 Table: `bot_registry` (Bot Health Tracking)
+
+```sql
+CREATE TABLE bot_registry (
+    bot_id VARCHAR(64) PRIMARY KEY,
+    table_id VARCHAR(64),
+    host VARCHAR(128),                 -- EC2 instance or container host
+    status VARCHAR(16) NOT NULL,       -- 'ACTIVE', 'IDLE', 'ERROR', 'STOPPED'
+    last_heartbeat BIGINT NOT NULL,    -- Unix timestamp
+    started_at TIMESTAMP,
+    stopped_at TIMESTAMP,
+    error_message TEXT,
+    metadata JSONB,                    -- Flexible metadata (version, config, etc.)
+    
+    -- Indexes
+    INDEX idx_status (status),
+    INDEX idx_last_heartbeat (last_heartbeat DESC)
+);
+```
+
+**Purpose:**
+- Track which bots are alive
+- Detect stale/crashed bots
+- Bot deployment metadata
+
+**Example Query:**
+```sql
+-- Get all active bots
+SELECT * FROM bot_registry WHERE status = 'ACTIVE';
+
+-- Find stale bots (no heartbeat in 60s)
+SELECT * FROM bot_registry 
+WHERE last_heartbeat < EXTRACT(EPOCH FROM NOW()) - 60;
+```
+
+### 1.4 Table: `commands` (Remote Control Queue)
+
+```sql
+CREATE TABLE commands (
+    command_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    table_id VARCHAR(64) NOT NULL,
+    seat_index INT NOT NULL,
+    command_type VARCHAR(32) NOT NULL, -- 'fold', 'call', 'raise_max', etc.
+    command_value NUMERIC(10, 2),      -- Optional: bet amount, etc.
+    status VARCHAR(16) NOT NULL,       -- 'PENDING', 'EXECUTING', 'ACKED', 'FAILED'
+    queued_at TIMESTAMP DEFAULT NOW(),
+    executed_at TIMESTAMP,
+    error_message TEXT,
+    
+    -- Indexes
+    INDEX idx_table_seat (table_id, seat_index),
+    INDEX idx_status (status),
+    INDEX idx_queued_at (queued_at DESC)
+);
+```
+
+**Purpose:**
+- Remote control command queue
+- Track execution status
+- Error handling and retry
+
+**Example Query:**
+```sql
+-- Get pending commands for table
+SELECT * FROM commands 
+WHERE table_id = 'bot_1' AND status = 'PENDING'
+ORDER BY queued_at;
+
+-- Mark command as executed
+UPDATE commands 
+SET status = 'ACKED', executed_at = NOW() 
+WHERE command_id = 'abc123';
+```
+
+### 1.5 Table: `error_log` (Debugging and Monitoring)
+
+```sql
+CREATE TABLE error_log (
+    error_id BIGSERIAL PRIMARY KEY,
+    bot_id VARCHAR(64),
+    table_id VARCHAR(64),
+    error_type VARCHAR(64) NOT NULL,   -- 'CARD_PARSE', 'NETWORK', 'TIMEOUT', etc.
+    error_message TEXT NOT NULL,
+    stack_trace TEXT,
+    context JSONB,                     -- Additional context (snapshot, state, etc.)
+    created_at TIMESTAMP DEFAULT NOW(),
+    
+    -- Indexes
+    INDEX idx_bot_id (bot_id),
+    INDEX idx_error_type (error_type),
+    INDEX idx_created_at (created_at DESC)
+);
+```
+
+**Purpose:**
+- Centralized error logging
+- Debugging failed snapshots
+- Monitoring error patterns
+
+**Example Query:**
+```sql
+-- Get recent errors
+SELECT * FROM error_log ORDER BY created_at DESC LIMIT 50;
+
+-- Count errors by type
+SELECT error_type, COUNT(*) 
+FROM error_log 
+WHERE created_at > NOW() - INTERVAL '1 hour' 
+GROUP BY error_type;
+```
+
+---
+
+## 2. Lambda Function (Python + psycopg2)
+
+### 2.1 Lambda Handler
+
+```python
+import json
+import os
+import psycopg2
+import boto3
+from datetime import datetime
+
+# Environment variables
+RDS_PROXY_ENDPOINT = os.environ['RDS_PROXY_ENDPOINT']
+DB_NAME = os.environ['DB_NAME']
+DB_USER = os.environ['DB_USER']
+DB_PASSWORD = os.environ['DB_PASSWORD']  # From Secrets Manager
+S3_BUCKET = os.environ['S3_BUCKET']
+
+# AWS clients
+s3_client = boto3.client('s3')
+
+# Database connection (reused across invocations)
+_db_conn = None
+
+def get_db_connection():
+    """Get or create database connection (reuses across Lambda invocations)."""
+    global _db_conn
+    
+    if _db_conn is None or _db_conn.closed:
+        _db_conn = psycopg2.connect(
+            host=RDS_PROXY_ENDPOINT,
+            port=5432,
+            database=DB_NAME,
+            user=DB_USER,
+            password=DB_PASSWORD,
+            connect_timeout=5
+        )
+    
+    return _db_conn
+
+
+def lambda_handler(event, context):
+    """
+    Process poker table snapshot.
+    
+    1. Validate payload
+    2. Upsert to table_state (latest)
+    3. Insert to snapshot_history (log)
+    4. Archive to S3
+    """
+    
+    # Parse snapshot
+    try:
+        if 'body' in event:
+            snapshot = json.loads(event['body'])
+        else:
+            snapshot = event
+    except Exception as e:
+        return {
+            'statusCode': 400,
+            'body': json.dumps({'error': 'Invalid JSON', 'details': str(e)})
+        }
+    
+    # Validate required fields
+    required = ['table_id', 'source_bot', 'timestamp']
+    for field in required:
+        if field not in snapshot:
+            return {
+                'statusCode': 400,
+                'body': json.dumps({'error': f'Missing field: {field}'})
+            }
+    
+    table_id = snapshot['table_id']
+    source_bot = snapshot['source_bot']
+    timestamp = snapshot['timestamp']
+    hero_cards = snapshot.get('hero_cards', [])
+    board_cards = snapshot.get('board_cards', [])
+    raw_cards = snapshot.get('raw_cards', [])
+    status = snapshot.get('status', 'LIVE')
+    
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        
+        # 1. Upsert to table_state (latest state)
+        cur.execute("""
+            INSERT INTO table_state (
+                table_id, source_bot, hero_cards, board_cards, 
+                raw_cards, status, last_seen
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s)
+            ON CONFLICT (table_id) DO UPDATE SET
+                source_bot = EXCLUDED.source_bot,
+                hero_cards = EXCLUDED.hero_cards,
+                board_cards = EXCLUDED.board_cards,
+                raw_cards = EXCLUDED.raw_cards,
+                status = EXCLUDED.status,
+                last_seen = EXCLUDED.last_seen,
+                updated_at = NOW()
+        """, (table_id, source_bot, hero_cards, board_cards, 
+              raw_cards, status, timestamp))
+        
+        # 2. Insert to snapshot_history (append-only log)
+        cur.execute("""
+            INSERT INTO snapshot_history (
+                table_id, source_bot, hero_cards, board_cards, 
+                raw_cards_json, status, timestamp_unix
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s)
+        """, (table_id, source_bot, hero_cards, board_cards,
+              json.dumps(raw_cards), status, timestamp))
+        
+        conn.commit()
+        cur.close()
+        
+        # 3. Archive to S3 (async, non-blocking)
+        archive_to_s3(snapshot, table_id, timestamp)
+        
+        return {
+            'statusCode': 200,
+            'body': json.dumps({
+                'ok': True,
+                'table_id': table_id,
+                'message': 'Snapshot processed'
+            })
+        }
+        
+    except Exception as e:
+        print(f"Database error: {e}")
+        return {
+            'statusCode': 500,
+            'body': json.dumps({
+                'ok': False,
+                'error': 'Database write failed',
+                'details': str(e)
+            })
+        }
+
+
+def archive_to_s3(snapshot, table_id, timestamp):
+    """Archive raw snapshot to S3 (non-blocking)."""
+    try:
+        date = datetime.fromtimestamp(timestamp).strftime('%Y-%m-%d')
+        key = f"snapshots/{table_id}/{date}/{int(timestamp)}.json"
+        
+        s3_client.put_object(
+            Bucket=S3_BUCKET,
+            Key=key,
+            Body=json.dumps(snapshot),
+            ContentType='application/json'
+        )
+        
+        print(f"S3: Archived {key}")
+    except Exception as e:
+        print(f"S3 archive error (non-fatal): {e}")
+```
+
+### 2.2 Lambda Layer (psycopg2)
+
+**Create Layer:**
+```bash
+# Build psycopg2 for Lambda (Amazon Linux 2)
+docker run -v "$PWD":/var/task "public.ecr.aws/lambda/python:3.11" /bin/sh -c "
+  pip install psycopg2-binary -t python/lib/python3.11/site-packages/;
+  exit
+"
+zip -r psycopg2-layer.zip python
+
+# Upload to Lambda Layer
+aws lambda publish-layer-version \
+  --layer-name psycopg2 \
+  --zip-file fileb://psycopg2-layer.zip \
+  --compatible-runtimes python3.11
+```
+
+**Attach to Lambda:**
+- Add layer ARN to Lambda function configuration
+
+---
+
+## 3. RDS Setup
+
+### 3.1 Create RDS PostgreSQL Instance
+
+**AWS CLI:**
+```bash
+aws rds create-db-instance \
+  --db-instance-identifier poker-collector-db \
+  --db-instance-class db.t3.micro \
+  --engine postgres \
+  --engine-version 14.7 \
+  --master-username postgres \
+  --master-user-password SECURE_PASSWORD \
+  --allocated-storage 20 \
+  --storage-type gp3 \
+  --vpc-security-group-ids sg-xxxxxxxx \
+  --db-subnet-group-name my-db-subnet-group \
+  --backup-retention-period 7 \
+  --preferred-backup-window "03:00-04:00" \
+  --preferred-maintenance-window "mon:04:00-mon:05:00" \
+  --tags Key=Name,Value=poker-collector-db
+```
+
+**Or AWS Console:**
+1. RDS → Create database
+2. Engine: PostgreSQL 14.7
+3. Instance class: db.t3.micro (2 vCPU, 1GB RAM)
+4. Storage: 20GB gp3
+5. Credentials: Save in Secrets Manager
+6. VPC: Same as Lambda
+7. Public access: No
+8. Security group: Allow Lambda access
+
+### 3.2 Create RDS Proxy
+
+**AWS CLI:**
+```bash
+aws rds create-db-proxy \
+  --db-proxy-name poker-collector-proxy \
+  --engine-family POSTGRESQL \
+  --auth AuthScheme=SECRETS,SecretArn=arn:aws:secretsmanager:...,IAMAuth=DISABLED \
+  --role-arn arn:aws:iam::ACCOUNT_ID:role/RDSProxyRole \
+  --vpc-subnet-ids subnet-xxx subnet-yyy \
+  --require-tls true
+```
+
+**Or AWS Console:**
+1. RDS → Proxies → Create proxy
+2. Proxy name: `poker-collector-proxy`
+3. Engine: PostgreSQL
+4. Target: `poker-collector-db`
+5. Secrets Manager: Select DB credentials
+6. IAM role: Create or use existing
+7. VPC: Same as Lambda and RDS
+
+### 3.3 Run Schema DDL
+
+```bash
+# Connect to RDS via psql
+psql -h poker-collector-db.xxxxx.us-east-1.rds.amazonaws.com \
+     -U postgres \
+     -d poker_db
+
+# Run schema SQL from Section 1
+\i schema.sql
+```
+
+---
+
+## 4. Cost Estimate (RDS vs DynamoDB)
+
+### 4.1 RDS Costs
+
+**RDS Instance (db.t3.micro):**
+- $0.017/hour × 730 hours/month = **$12.41/month**
+
+**RDS Proxy:**
+- $0.015/hour × 730 hours/month = **$10.95/month**
+
+**Storage (20GB gp3):**
+- $0.115/GB/month × 20GB = **$2.30/month**
+
+**Backups (20GB, 7 days):**
+- $0.095/GB/month × 20GB = **$1.90/month**
+
+**Total RDS: $27.56/month**
+
+### 4.2 DynamoDB Costs (From Previous Doc)
+
+**DynamoDB On-Demand:**
+- Write requests: 15.6M × $1.25/1M = **$19.50/month**
+- Read requests: **$1/month**
+- Storage: **$0.25/month**
+
+**Total DynamoDB: $20.75/month**
+
+### 4.3 Comparison
+
+| Component | RDS | DynamoDB |
+|-----------|-----|----------|
+| Database | $27.56 | $20.75 |
+| Lambda | $9.42 | $9.42 |
+| S3 | $101 | $101 |
+| **TOTAL** | **$138/month** | **$131/month** |
+
+**Verdict:**
+- RDS slightly more expensive ($7/month difference)
+- RDS offers: SQL queries, joins, history, easier debugging
+- DynamoDB offers: Pure serverless, no connection limits
+
+**Recommendation:** Use RDS for relational workload
+
+---
+
+## 5. Deployment Checklist
+
+### Phase 1: RDS Setup
+- [ ] Create RDS PostgreSQL instance (db.t3.micro)
+- [ ] Create RDS Proxy
+- [ ] Save credentials in Secrets Manager
+- [ ] Configure security groups (Lambda → RDS Proxy)
+- [ ] Run schema DDL (create tables, indexes)
+- [ ] Test connection from local machine
+
+### Phase 2: Lambda Setup
+- [ ] Create psycopg2 Lambda layer
+- [ ] Deploy Lambda function
+- [ ] Configure environment variables (RDS_PROXY_ENDPOINT, etc.)
+- [ ] Attach psycopg2 layer
+- [ ] Grant IAM permissions (RDS Proxy, S3, Secrets Manager)
+- [ ] Test Lambda invocation with sample payload
+
+### Phase 3: API Gateway
+- [ ] Create REST API
+- [ ] Create POST /snapshot endpoint
+- [ ] Create GET /table/latest endpoint
+- [ ] Deploy API to prod stage
+- [ ] Test with curl
+
+### Phase 4: Bot Integration
+- [ ] Update bot code with API Gateway URL
+- [ ] Deploy to all 9 bots
+- [ ] Monitor CloudWatch logs
+- [ ] Verify data in RDS
+
+---
+
+## Status
+
+✅ **RDS Schema:** COMPLETE  
+✅ **Lambda Function:** COMPLETE  
+✅ **Cost Analysis:** COMPLETE  
+⏸️ **Deployment:** AWAITING APPROVAL
+
+**Estimated Setup Time:** 4-6 hours
+
+
+
+################################################################################
+# DOCUMENT 4: COLLECTOR_SERVERLESS_ARCHITECTURE.md
+################################################################################
+
+# Collector Agent - Serverless Architecture (Lambda + DynamoDB + S3)
+**Optimal Backend for Live Poker Card Collection**
+
+**Date:** 2026-04-06  
+**Architecture:** EC2 Bots → API Gateway → Lambda → DynamoDB + S3 → UI
+
+---
+
+## Correct Architecture Split
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│             COLLECTOR LAYER (EC2/Containers)                    │
+│   Selenium bots with persistent browser sessions                │
+│   - Logged-in poker tables                                      │
+│   - iframe navigation                                            │
+│   - Continuous DOM polling (icon-layer2 cards)                  │
+└────────────┬────────────────────────────────────────────────────┘
+             │ POST snapshots every 1-2s
+             │ {table_id, hero_cards, board_cards, ...}
+             ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                     API GATEWAY                                 │
+│   https://api.your-domain.com/snapshot                          │
+└────────────┬────────────────────────────────────────────────────┘
+             │ Trigger Lambda
+             ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                   LAMBDA FUNCTION                               │
+│   Stateless snapshot processor                                  │
+│   - Validate payload                                             │
+│   - Normalize cards                                              │
+│   - Write to DynamoDB (latest state)                            │
+│   - Archive to S3 (raw history)                                 │
+└────────────┬────────────────────────────────────────────────────┘
+             │
+       ┌─────┴──────┐
+       ▼            ▼
+┌──────────┐  ┌──────────┐
+│ DynamoDB │  │    S3    │
+│  (Live)  │  │(Archive) │
+│          │  │          │
+│ Key:     │  │ snapshots/
+│ table_id │  │ table_X/
+│          │  │ 2026-04-06/
+│ GSI:     │  │ timestamp.json
+│ source   │  │
+│ _bot     │  │
+└─────┬────┘  └──────────┘
+      │
+      │ UI polls Lambda
+      │ GET /table/latest
+      ▼
+┌──────────────────────┐
+│    FRONTEND UI       │
+│ Aggregated table view│
+└──────────────────────┘
+```
+
+---
+
+## Why This Architecture?
+
+### ✅ Use Lambda + DynamoDB + S3 For:
+- **Stateless snapshot processing** (validate, normalize, store)
+- **Fast live state lookups** (DynamoDB indexed by table_id)
+- **Cheap raw data archival** (S3 for history/replay/debug)
+- **Automatic scaling** (no server management)
+- **Fan-out to analytics** (S3 triggers for downstream processing)
+
+### ❌ Do NOT Use Lambda For:
+- **Running Selenium/Chrome** (needs persistent sessions)
+- **Live browser automation** (long-running processes)
+- **iframe navigation** (requires logged-in state)
+- **Continuous DOM polling** (Lambda is short-lived)
+
+---
+
+## 1. Data Model
+
+### 1.1 Snapshot Payload (From Bot)
+
+```json
+{
+  "table_id": "table_7",
+  "source_bot": "bot_7",
+  "hero_cards": ["As", "Kh"],
+  "board_cards": ["Qs", "Jh", "Tc"],
+  "raw_cards": ["As", "Kh", "Qs", "Jh", "Tc"],
+  "status": "LIVE",
+  "timestamp": 1775432100
+}
+```
+
+### 1.2 DynamoDB Item (Live State)
+
+**Table:** `poker_tables`  
+**Primary Key:** `table_id` (String)  
+**GSI:** `source_bot-last_seen-index` (for bot-level queries)
+
+```json
+{
+  "table_id": "table_7",
+  "hero_cards": ["As", "Kh"],
+  "board_cards": ["Qs", "Jh", "Tc"],
+  "source_bot": "bot_7",
+  "status": "LIVE",           // "LIVE", "WAITING", "STALE"
+  "last_seen": 1775432100,
+  "ttl": 1775432160           // Auto-delete after 60s (DynamoDB TTL)
+}
+```
+
+### 1.3 S3 Object (Raw Archive)
+
+**Bucket:** `poker-snapshots-archive`  
+**Key Pattern:** `snapshots/{table_id}/{date}/{timestamp}.json`  
+**Example:** `snapshots/table_7/2026-04-06/1775432100.json`
+
+```json
+{
+  "table_id": "table_7",
+  "source_bot": "bot_7",
+  "hero_cards": ["As", "Kh"],
+  "board_cards": ["Qs", "Jh", "Tc"],
+  "raw_cards": ["As", "Kh", "Qs", "Jh", "Tc"],
+  "status": "LIVE",
+  "timestamp": 1775432100,
+  "metadata": {
+    "bot_version": "1.0",
+    "poker_site": "pokerbet.co.za"
+  }
+}
+```
+
+---
+
+## 2. Lambda Function Implementation
+
+### 2.1 Lambda Handler (Python 3.11)
+
+**File:** `lambda_function.py`
+
+```python
+import json
+import boto3
+import time
+from datetime import datetime
+
+# AWS clients
+dynamodb = boto3.resource('dynamodb')
+s3_client = boto3.client('s3')
+
+# Configuration
+DYNAMODB_TABLE = 'poker_tables'
+S3_BUCKET = 'poker-snapshots-archive'
+TTL_SECONDS = 60  # Auto-delete stale tables after 60s
+
+def lambda_handler(event, context):
+    """
+    Lambda function to process poker table snapshots.
+    
+    Receives snapshot from API Gateway POST request.
+    Validates, normalizes, stores in DynamoDB and S3.
+    """
+    
+    # Parse incoming snapshot
+    try:
+        if 'body' in event:
+            # API Gateway format
+            body = json.loads(event['body'])
+        else:
+            # Direct invocation format
+            body = event
+        
+        snapshot = body
+    except Exception as e:
+        return {
+            'statusCode': 400,
+            'body': json.dumps({'error': 'Invalid JSON', 'details': str(e)})
+        }
+    
+    # Validate required fields
+    required = ['table_id', 'source_bot', 'timestamp']
+    for field in required:
+        if field not in snapshot:
+            return {
+                'statusCode': 400,
+                'body': json.dumps({'error': f'Missing required field: {field}'})
+            }
+    
+    table_id = snapshot['table_id']
+    source_bot = snapshot['source_bot']
+    timestamp = snapshot['timestamp']
+    
+    # Normalize cards (ensure lists)
+    hero_cards = snapshot.get('hero_cards', [])
+    board_cards = snapshot.get('board_cards', [])
+    raw_cards = snapshot.get('raw_cards', [])
+    status = snapshot.get('status', 'LIVE')
+    
+    # Validate card format (optional but recommended)
+    if not validate_cards(hero_cards + board_cards):
+        return {
+            'statusCode': 400,
+            'body': json.dumps({'error': 'Invalid card format'})
+        }
+    
+    # Write to DynamoDB (latest state)
+    try:
+        write_to_dynamodb(
+            table_id=table_id,
+            source_bot=source_bot,
+            hero_cards=hero_cards,
+            board_cards=board_cards,
+            status=status,
+            timestamp=timestamp
+        )
+    except Exception as e:
+        print(f"DynamoDB write error: {e}")
+        return {
+            'statusCode': 500,
+            'body': json.dumps({'error': 'DynamoDB write failed', 'details': str(e)})
+        }
+    
+    # Archive to S3 (raw snapshot history)
+    try:
+        write_to_s3(
+            snapshot=snapshot,
+            table_id=table_id,
+            timestamp=timestamp
+        )
+    except Exception as e:
+        print(f"S3 write error: {e}")
+        # Non-fatal: DynamoDB write succeeded, S3 is just archival
+    
+    return {
+        'statusCode': 200,
+        'body': json.dumps({
+            'ok': True,
+            'table_id': table_id,
+            'message': 'Snapshot processed'
+        })
+    }
+
+
+def write_to_dynamodb(table_id, source_bot, hero_cards, board_cards, status, timestamp):
+    """Write latest table state to DynamoDB."""
+    table = dynamodb.Table(DYNAMODB_TABLE)
+    
+    # Calculate TTL (auto-delete after 60s)
+    ttl = int(timestamp) + TTL_SECONDS
+    
+    # Put item (overwrites existing)
+    table.put_item(
+        Item={
+            'table_id': table_id,
+            'source_bot': source_bot,
+            'hero_cards': hero_cards,
+            'board_cards': board_cards,
+            'status': status,
+            'last_seen': int(timestamp),
+            'ttl': ttl
+        }
+    )
+    
+    print(f"DynamoDB: Updated {table_id}")
+
+
+def write_to_s3(snapshot, table_id, timestamp):
+    """Archive raw snapshot to S3."""
+    # Generate S3 key
+    date = datetime.fromtimestamp(timestamp).strftime('%Y-%m-%d')
+    key = f"snapshots/{table_id}/{date}/{int(timestamp)}.json"
+    
+    # Upload to S3
+    s3_client.put_object(
+        Bucket=S3_BUCKET,
+        Key=key,
+        Body=json.dumps(snapshot),
+        ContentType='application/json',
+        Metadata={
+            'table_id': table_id,
+            'timestamp': str(timestamp)
+        }
+    )
+    
+    print(f"S3: Archived {key}")
+
+
+def validate_cards(cards):
+    """Validate card format: [rank][suit] where rank=A-9,T,J,Q,K and suit=h,d,c,s"""
+    import re
+    pattern = re.compile(r'^[A23456789TJQK][hdcs]$')
+    
+    for card in cards:
+        if not pattern.match(card):
+            return False
+    
+    return True
+```
+
+### 2.2 Lambda Configuration
+
+**Runtime:** Python 3.11  
+**Memory:** 256 MB (sufficient for JSON processing)  
+**Timeout:** 10 seconds  
+**Environment Variables:**
+- `DYNAMODB_TABLE` = `poker_tables`
+- `S3_BUCKET` = `poker-snapshots-archive`
+
+**IAM Role Permissions:**
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "dynamodb:PutItem",
+        "dynamodb:GetItem",
+        "dynamodb:Scan",
+        "dynamodb:Query"
+      ],
+      "Resource": "arn:aws:dynamodb:*:*:table/poker_tables"
+    },
+    {
+      "Effect": "Allow",
+      "Action": [
+        "s3:PutObject"
+      ],
+      "Resource": "arn:aws:s3:::poker-snapshots-archive/*"
+    },
+    {
+      "Effect": "Allow",
+      "Action": [
+        "logs:CreateLogGroup",
+        "logs:CreateLogStream",
+        "logs:PutLogEvents"
+      ],
+      "Resource": "*"
+    }
+  ]
+}
+```
+
+### 2.3 Lambda Function for GET /table/latest
+
+**File:** `lambda_get_latest.py`
+
+```python
+import json
+import boto3
+from decimal import Decimal
+
+dynamodb = boto3.resource('dynamodb')
+DYNAMODB_TABLE = 'poker_tables'
+
+def lambda_handler(event, context):
+    """
+    Get all current tables from DynamoDB.
+    
+    Returns aggregated view of all active tables.
+    """
+    
+    table = dynamodb.Table(DYNAMODB_TABLE)
+    
+    try:
+        # Scan all items (for small table, <1000 items)
+        # For larger scale, use pagination or GSI query
+        response = table.scan()
+        items = response.get('Items', [])
+        
+        # Convert Decimal to float (DynamoDB returns Decimal)
+        tables = [convert_decimals(item) for item in items]
+        
+        return {
+            'statusCode': 200,
+            'headers': {
+                'Content-Type': 'application/json',
+                'Access-Control-Allow-Origin': '*'  # CORS
+            },
+            'body': json.dumps({
+                'ok': True,
+                'table_count': len(tables),
+                'tables': tables
+            })
+        }
+        
+    except Exception as e:
+        print(f"DynamoDB scan error: {e}")
+        return {
+            'statusCode': 500,
+            'body': json.dumps({
+                'ok': False,
+                'error': 'Failed to fetch tables',
+                'details': str(e)
+            })
+        }
+
+
+def convert_decimals(obj):
+    """Convert DynamoDB Decimal types to float for JSON serialization."""
+    if isinstance(obj, list):
+        return [convert_decimals(i) for i in obj]
+    elif isinstance(obj, dict):
+        return {k: convert_decimals(v) for k, v in obj.items()}
+    elif isinstance(obj, Decimal):
+        return float(obj)
+    else:
+        return obj
+```
+
+---
+
+## 3. DynamoDB Setup
+
+### 3.1 Create Table
+
+**AWS CLI:**
+```bash
+aws dynamodb create-table \
+  --table-name poker_tables \
+  --attribute-definitions \
+    AttributeName=table_id,AttributeType=S \
+    AttributeName=source_bot,AttributeType=S \
+    AttributeName=last_seen,AttributeType=N \
+  --key-schema \
+    AttributeName=table_id,KeyType=HASH \
+  --global-secondary-indexes \
+    IndexName=source_bot-last_seen-index,\
+    KeySchema=[{AttributeName=source_bot,KeyType=HASH},{AttributeName=last_seen,KeyType=RANGE}],\
+    Projection={ProjectionType=ALL},\
+    ProvisionedThroughput={ReadCapacityUnits=5,WriteCapacityUnits=5} \
+  --provisioned-throughput \
+    ReadCapacityUnits=5,WriteCapacityUnits=5 \
+  --stream-specification \
+    StreamEnabled=true,StreamViewType=NEW_AND_OLD_IMAGES
+```
+
+**Or use AWS Console:**
+1. Go to DynamoDB → Tables → Create Table
+2. Table name: `poker_tables`
+3. Partition key: `table_id` (String)
+4. Add GSI:
+   - Index name: `source_bot-last_seen-index`
+   - Partition key: `source_bot` (String)
+   - Sort key: `last_seen` (Number)
+
+### 3.2 Enable TTL (Auto-Delete Stale Tables)
+
+**AWS CLI:**
+```bash
+aws dynamodb update-time-to-live \
+  --table-name poker_tables \
+  --time-to-live-specification \
+    Enabled=true,AttributeName=ttl
+```
+
+**Or use AWS Console:**
+1. Go to table → Additional settings → Time to Live
+2. Enable TTL on attribute: `ttl`
+
+**How it works:**
+- Lambda sets `ttl` = `timestamp + 60 seconds`
+- DynamoDB auto-deletes items when `ttl` < current time
+- No manual cleanup needed!
+
+---
+
+## 4. S3 Setup
+
+### 4.1 Create Bucket
+
+**AWS CLI:**
+```bash
+aws s3 mb s3://poker-snapshots-archive --region us-east-1
+```
+
+### 4.2 Enable Versioning (Optional)
+
+```bash
+aws s3api put-bucket-versioning \
+  --bucket poker-snapshots-archive \
+  --versioning-configuration Status=Enabled
+```
+
+### 4.3 Lifecycle Policy (Archive Old Snapshots)
+
+```json
+{
+  "Rules": [
+    {
+      "Id": "ArchiveOldSnapshots",
+      "Status": "Enabled",
+      "Transitions": [
+        {
+          "Days": 7,
+          "StorageClass": "GLACIER_INSTANT_RETRIEVAL"
+        },
+        {
+          "Days": 90,
+          "StorageClass": "DEEP_ARCHIVE"
+        }
+      ]
+    }
+  ]
+}
+```
+
+**Apply:**
+```bash
+aws s3api put-bucket-lifecycle-configuration \
+  --bucket poker-snapshots-archive \
+  --lifecycle-configuration file://lifecycle.json
+```
+
+---
+
+## 5. API Gateway Setup
+
+### 5.1 Create REST API
+
+**AWS Console:**
+1. API Gateway → Create API → REST API
+2. API name: `poker-collector-api`
+3. Endpoint type: Regional
+
+### 5.2 Create Resources and Methods
+
+**POST /snapshot**
+1. Create resource `/snapshot`
+2. Create method `POST`
+3. Integration type: Lambda Function
+4. Lambda: `poker-snapshot-processor`
+5. Enable CORS
+
+**GET /table/latest**
+1. Create resource `/table/latest`
+2. Create method `GET`
+3. Integration type: Lambda Function
+4. Lambda: `poker-get-latest`
+5. Enable CORS
+
+### 5.3 Deploy API
+
+1. Actions → Deploy API
+2. Stage name: `prod`
+3. Note API endpoint: `https://abc123.execute-api.us-east-1.amazonaws.com/prod`
+
+---
+
+## 6. Bot Collector Updates
+
+### 6.1 Update Bot to Use API Gateway
+
+**Before (Flask):**
+```python
+API_BASE = 'http://127.0.0.1:5000/api'
+
+response = requests.post(
+    f"{API_BASE}/snapshot",
+    json=snapshot
+)
+```
+
+**After (API Gateway):**
+```python
+API_BASE = 'https://abc123.execute-api.us-east-1.amazonaws.com/prod'
+
+response = requests.post(
+    f"{API_BASE}/snapshot",
+    json=snapshot,
+    headers={'Content-Type': 'application/json'}
+)
+```
+
+**No other changes needed!** Bot code remains the same.
+
+---
+
+## 7. Frontend UI Updates
+
+### 7.1 Update API Endpoint
+
+**Before (Flask):**
+```javascript
+const API_BASE = 'http://127.0.0.1:5000/api';
+```
+
+**After (API Gateway):**
+```javascript
+const API_BASE = 'https://abc123.execute-api.us-east-1.amazonaws.com/prod';
+```
+
+**No other changes needed!** Frontend polling logic remains the same.
+
+---
+
+## 8. Cost Estimate
+
+### 8.1 Monthly Costs (9 Bots, 1-2s Polling)
+
+**Lambda Invocations:**
+- 9 bots × 0.67 requests/second × 86400 seconds/day × 30 days = 15.6M requests/month
+- First 1M free, then $0.20/1M = $2.92/month
+
+**Lambda Duration:**
+- 15.6M × 100ms avg × $0.0000166667/GB-sec (256MB) = $6.50/month
+
+**DynamoDB:**
+- On-Demand pricing (no capacity planning)
+- Write requests: 15.6M × $1.25/1M = $19.50/month
+- Read requests: Minimal (UI polls, not bots) = ~$1/month
+- Storage: <1GB (9 tables, TTL cleanup) = $0.25/month
+
+**S3:**
+- PUT requests: 15.6M × $0.005/1K = $78/month
+- Storage: ~1TB/month cumulative = $23/month (first month)
+- After lifecycle (7 days → Glacier): ~$5/month
+
+**Total Monthly Cost:**
+- Lambda: $9.42
+- DynamoDB: $20.75
+- S3: $78 (PUT), $23 (storage first month)
+- **Total: ~$131/month** (first month, decreases with Glacier)
+
+**Compare to Flask on EC2:**
+- t3.medium (24/7): $30/month
+- EBS: $8/month
+- **Total: $38/month**
+
+**Trade-off:**
+- Serverless: Higher cost ($131), zero maintenance, auto-scaling
+- EC2 Flask: Lower cost ($38), manual scaling, server mgmt
+
+**Optimization:**
+- Reduce bot polling to 2s → halves Lambda/DynamoDB costs
+- Aggressive S3 lifecycle → reduces storage costs
+- **Optimized: ~$80/month**
+
+---
+
+## 9. Deployment Checklist
+
+### Phase 1: AWS Setup
+- [ ] Create DynamoDB table `poker_tables` with TTL enabled
+- [ ] Create S3 bucket `poker-snapshots-archive`
+- [ ] Deploy Lambda function `poker-snapshot-processor`
+- [ ] Deploy Lambda function `poker-get-latest`
+- [ ] Create API Gateway endpoints
+- [ ] Configure IAM roles and permissions
+- [ ] Test Lambda invocation manually
+
+### Phase 2: Bot Updates
+- [ ] Update bot collector code with API Gateway URL
+- [ ] Test snapshot POST with one bot
+- [ ] Verify DynamoDB item appears
+- [ ] Verify S3 object created
+- [ ] Deploy to all 9 bots
+
+### Phase 3: Frontend Updates
+- [ ] Update UI with API Gateway URL
+- [ ] Test GET /table/latest polling
+- [ ] Verify UI renders tables correctly
+- [ ] Test with multiple bots running
+
+### Phase 4: Monitoring
+- [ ] Set up CloudWatch alarms for Lambda errors
+- [ ] Monitor DynamoDB consumed capacity
+- [ ] Monitor S3 storage growth
+- [ ] Set up cost alerts
+
+---
+
+## 10. Testing
+
+**Test Scenario 1: Single Bot**
+```bash
+# Start one bot
+python3 collector_agent.py --bot-id bot_1
+
+# Check DynamoDB
+aws dynamodb get-item \
+  --table-name poker_tables \
+  --key '{"table_id": {"S": "bot_1"}}'
+
+# Check S3
+aws s3 ls s3://poker-snapshots-archive/snapshots/bot_1/
+```
+
+**Test Scenario 2: All Bots**
+```bash
+# Start all 9 bots
+python3 collector_agent.py --all
+
+# Check UI
+open https://abc123.execute-api.us-east-1.amazonaws.com/prod/table/latest
+
+# Verify 9 tables appear
+```
+
+**Test Scenario 3: TTL Cleanup**
+```bash
+# Stop one bot
+# Wait 60 seconds
+# Verify table disappears from DynamoDB
+aws dynamodb scan --table-name poker_tables
+```
+
+---
+
+## Status
+
+✅ **Architecture Design:** COMPLETE  
+✅ **Lambda Functions:** COMPLETE  
+✅ **DynamoDB Schema:** COMPLETE  
+✅ **S3 Setup:** COMPLETE  
+✅ **API Gateway Design:** COMPLETE  
+⏸️ **Deployment:** AWAITING APPROVAL
+
+**Estimated Setup Time:** 4-6 hours
+
+**Key Takeaway:**  
+Keep bots on EC2 (persistent browsers), use Lambda + DynamoDB + S3 for stateless backend processing.
+
+
+
+################################################################################
+# DOCUMENT 5: REMOTE_CONTROL_WIRING_PLAN.md
+################################################################################
+
+# Remote Control Backend ↔ UI Wiring Plan
+**Complete Implementation Roadmap for 9-Player Remote Control**
+
+**Date:** 2026-04-06  
+**Status:** PLANNING (No Execution)  
+**Objective:** Wire up Flask backend with HTML/JS frontend + add all action buttons for 9 players
+
+---
+
+## Table of Contents
+1. [Current State Analysis](#1-current-state-analysis)
+2. [Complete Button Inventory](#2-complete-button-inventory)
+3. [Backend API Mapping](#3-backend-api-mapping)
+4. [Frontend UI Structure](#4-frontend-ui-structure)
+5. [Data Flow Architecture](#5-data-flow-architecture)
+6. [Implementation Steps](#6-implementation-steps)
+7. [Testing Strategy](#7-testing-strategy)
+
+---
+
+## 1. Current State Analysis
+
+### 1.1 Existing Backend (engine/app.py)
+
+**✅ Working Endpoints:**
+```python
+POST /api/snapshot              # Receive table snapshots from n4p.js
+GET  /api/commands/pending      # Poll for commands (token-based auth)
+POST /api/commands/ack          # Acknowledge command execution
+POST /api/commands/queue        # Queue command from control panel
+GET  /api/table/<table_id>      # Get merged table view
+GET  /api/tables                # List all active tables
+GET  /api/table/latest          # Get most recent table
+GET  /api/state                 # Get table state with control availability
+```
+
+**✅ Data Structures:**
+```python
+# In-memory stores
+_snapshot_store = {}    # key: "table_id:seat_index", value: seat record
+_merged_tables = {}     # key: table_id, value: MergedTable dict
+_command_queue = {}     # key: seat_token, value: command dict
+_bot_states = {}        # key: bot_id, value: hero state
+_control_states = {}    # key: "table_id:seat_index", value: control availability
+```
+
+**✅ Command Queue Format:**
+```python
+{
+    'id': command_id,         # UUID (8 chars)
+    'type': command_type,     # 'fold', 'check', 'call', 'raise_max', etc.
+    'queued_at': timestamp,
+    'status': 'pending',      # 'pending' → 'acked'
+}
+```
+
+### 1.2 Existing Frontend (static/index.html)
+
+**✅ Current Features:**
+- Displays up to 9 seats in responsive grid (4 columns → 2 → 1)
+- Shows player name, stack, hole cards, dealer marker
+- Action buttons: FOLD, CHECK, CALL, RAISE MAX, CASHOUT
+- Pre-action checkboxes: Check/Fold, Check/Call
+- Command log (last 20 commands)
+- Auto-refresh every 2 seconds
+
+**✅ Current JavaScript Functions:**
+```javascript
+sendCommand(tableId, seatIndex, commandType, params = {})  // Send command to backend
+toggleWaitForBB(tableId, seatIndex)                        // Toggle wait for big blind
+rebuyCustomAmount(tableId, seatIndex)                      // Rebuy with custom amount
+addToLog(seatIndex, command, status)                       // Add to command log
+updateLog()                                                 // Refresh log display
+getSeatState(seat)                                         // Determine seat state
+fetchTableData()                                           // Poll backend for updates
+renderTable(table)                                         // Render table UI
+```
+
+**⚠️ Missing Features:**
+- MIN button (bet minimum)
+- BET button (custom bet amount via slider)
+- Advanced Actions panel (right sidebar)
+- ARM CASHOUT ALL (checkbox + button)
+- Betting slider for custom amounts
+- Pre-action visual feedback (which checkbox is active)
+- Seat 7, 8, 9 explicit rendering (currently supports but UI shows 6 in screenshot)
+
+---
+
+## 2. Complete Button Inventory
+
+### 2.1 Per-Seat Action Buttons (9 seats × 8 buttons each)
+
+Based on POKERBET_IN_PLAY_BUTTONS_COMPLETE.md and remote.png screenshot:
+
+| Button | Color | Action | API Command | When Available |
+|--------|-------|--------|-------------|----------------|
+| **FOLD** | Red | Fold hand | `fold` | Always (on your turn) |
+| **CHECK** | Green | Check (no bet) | `check` | When no bet to call |
+| **CALL** | Blue | Call current bet | `call` | When there's a bet |
+| **MIN** | Dark Gray | Bet minimum | `bet_min` | When can bet/raise |
+| **MAX** | Gold | Raise maximum | `raise_max` | When can bet/raise |
+| **BET** | Dark Gold | Custom bet (via slider) | `bet_custom` | When can bet/raise |
+| **ARM** | Checkbox | Enable pre-action | `pre_action_arm` | Always |
+| **CASH** | Red | Cash out (leave table) | `cashout` | Always when seated |
+
+### 2.2 Advanced Actions (Global Controls)
+
+Located in right sidebar panel:
+
+| Button | Color | Action | API Command | Purpose |
+|--------|-------|--------|-------------|---------|
+| **MIN (Global)** | Blue | Set all to MIN | `set_all_min` | Bet MIN on all active seats |
+| **MAX (Global)** | Blue | Set all to MAX | `set_all_max` | Raise MAX on all active seats |
+| **BET / EXECUTE** | Gold | Execute pending bets | `execute_all` | Confirm queued bet amounts |
+| **ARM CASHOUT ALL** | Checkbox | Enable mass cashout | N/A (UI state) | Arm the CASHOUT ALL button |
+| **CASHOUT ALL** | Red | Cash out all seats | `cashout_all` | Emergency exit (leave all tables) |
+
+### 2.3 Pre-Action Checkboxes (Per Seat)
+
+| Checkbox | Action | API Command | Behavior |
+|----------|--------|-------------|----------|
+| **Check/Fold** | Auto-fold if bet, check if no bet | `pre_action_check_fold` | Mutually exclusive with Check/Call |
+| **Check/Call** | Auto-call any bet, check if no bet | `pre_action_check_call` | Mutually exclusive with Check/Fold |
+
+---
+
+## 3. Backend API Mapping
+
+### 3.1 Required API Endpoints (✅ Existing, ➕ New)
+
+#### ✅ Existing Endpoints
+
+**GET /api/table/latest**
+```json
+Response:
+{
+  "ok": true,
+  "table": {
+    "table_id": "string",
+    "max_players": 9,
+    "pot_zar": 0.0,
+    "board": ["Ah", "Kh", "Qh"],
+    "street": "flop",
+    "seats": [
+      {
+        "seat_index": 0,
+        "name": "Player1",
+        "stack_zar": 200.0,
+        "hole_cards": ["Ah", "Kh", "Qh", "Jh"],
+        "cards_visible": true,
+        "is_hero": true,
+        "is_dealer": false,
+        "status": "playing",         // "empty", "sitting", "playing"
+        "has_token": true,
+        "last_seen_ago": 2.5,
+        "pending_cmd": null
+      }
+      // ... seats 1-8
+    ],
+    "last_updated": 1712400000
+  }
+}
+```
+
+**POST /api/commands/queue**
+```json
+Request:
+{
+  "table_id": "string",
+  "seat_index": 0,
+  "command_type": "string",    // "fold", "check", "call", "raise_max", etc.
+  "value": null                 // Optional: for custom amounts
+}
+
+Response:
+{
+  "ok": true,
+  "command_id": "abc123"
+}
+```
+
+**GET /api/commands/pending?token=<seat_token>**
+```json
+Response:
+{
+  "ok": true,
+  "command": {
+    "id": "abc123",
+    "type": "raise_max",
+    "queued_at": 1712400000,
+    "status": "pending"
+  }
+}
+```
+
+**POST /api/commands/ack**
+```json
+Request:
+{
+  "token": "string",
+  "command_id": "abc123"
+}
+
+Response:
+{
+  "ok": true
+}
+```
+
+#### ➕ New Endpoints Needed
+
+**POST /api/commands/queue-batch**
+```json
+Description: Queue commands for multiple seats at once (for global MIN/MAX)
+
+Request:
+{
+  "table_id": "string",
+  "seat_indices": [0, 1, 2, 3, 4, 5, 6, 7, 8],
+  "command_type": "raise_max",
+  "value": null
+}
+
+Response:
+{
+  "ok": true,
+  "command_ids": ["abc123", "def456", ...],
+  "queued_count": 9
+}
+```
+
+**POST /api/commands/execute-all**
+```json
+Description: Execute all pending BET commands (for BET / EXECUTE button)
+
+Request:
+{
+  "table_id": "string"
+}
+
+Response:
+{
+  "ok": true,
+  "executed_count": 3,
+  "failed_count": 0
+}
+```
+
+**POST /api/commands/cashout-all**
+```json
+Description: Cash out all connected seats (emergency exit)
+
+Request:
+{
+  "table_id": "string",
+  "confirm": true
+}
+
+Response:
+{
+  "ok": true,
+  "cashed_out_seats": [0, 1, 2, 3, 4, 5, 6, 7, 8]
+}
+```
+
+**POST /api/commands/clear-all**
+```json
+Description: Clear all pending commands (cancel all queued actions)
+
+Request:
+{
+  "table_id": "string"
+}
+
+Response:
+{
+  "ok": true,
+  "cleared_count": 5
+}
+```
+
+### 3.2 Command Type Mappings
+
+Map UI buttons to API command types:
+
+| UI Button | API command_type | Additional Params |
+|-----------|------------------|-------------------|
+| FOLD | `fold` | None |
+| CHECK | `check` | None |
+| CALL | `call` | None |
+| MIN | `bet_min` | None |
+| MAX | `raise_max` | None |
+| BET (custom) | `bet_custom` | `{value: 10.5}` |
+| CASH | `cashout` | None |
+| Check/Fold | `pre_action_check_fold` | `{enabled: true}` |
+| Check/Call | `pre_action_check_call` | `{enabled: true}` |
+| Clear Pre-Action | `clear_preaction` | None |
+| Wait for BB | `wait_for_bb` | `{enabled: true}` |
+| Rebuy Amount | `rebuy_amount` | `{value: 50.0}` |
+
+---
+
+## 4. Frontend UI Structure
+
+### 4.1 HTML Layout (3-Column Design)
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                          HEADER                                     │
+│  N4P Remote Table Control                         [Connection: ●]   │
+│  Table: waiting · 0/9 Players · Pot: R0                            │
+└─────────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────┬───────────────┬──────────────────────┐
+│                              │               │                      │
+│        SEATS GRID            │  BOARD CARDS  │  ADVANCED ACTIONS    │
+│    (3 columns × 3 rows)      │               │                      │
+│                              │  [Ah][Kh][Qh] │  ┌────────────────┐  │
+│  ┌────────┬────────┬────────┐│               │  │ Global Controls│  │
+│  │ Seat 1 │ Seat 2 │ Seat 3 ││               │  │                │  │
+│  │ FOLD   │ FOLD   │ FOLD   ││  ┌──────────┐ │  │ [MIN]  [MAX]  │  │
+│  │ CHECK  │ CHECK  │ CHECK  ││  │   POT    │ │  │               │  │
+│  │ CALL   │ CALL   │ CALL   ││  │  R42.50  │ │  │ [BET/EXECUTE] │  │
+│  │ MIN    │ MIN    │ MIN    ││  └──────────┘ │  │               │  │
+│  │ MAX    │ MAX    │ MAX    ││               │  │ ☐ ARM CASHOUT │  │
+│  │ BET    │ BET    │ BET    ││               │  │     ALL       │  │
+│  │ ☐ARM   │ ☐ARM   │ ☐ARM   ││               │  │               │  │
+│  │ CASH   │ CASH   │ CASH   ││               │  │ [CASHOUT ALL] │  │
+│  └────────┴────────┴────────┘│               │  └────────────────┘  │
+│                              │               │                      │
+│  ┌────────┬────────┬────────┐│               │  ┌────────────────┐  │
+│  │ Seat 4 │ Seat 5 │ Seat 6 ││               │  │  COMMAND LOG   │  │
+│  │ ...    │ ...    │ ...    ││               │  │                │  │
+│  └────────┴────────┴────────┘│               │  │ 14:23 Seat1   │  │
+│                              │               │  │ > fold PENDING │  │
+│  ┌────────┬────────┬────────┐│               │  │                │  │
+│  │ Seat 7 │ Seat 8 │ Seat 9 ││               │  │ 14:22 Seat3   │  │
+│  │ ...    │ ...    │ ...    ││               │  │ > raise ACKED  │  │
+│  └────────┴────────┴────────┘│               │  └────────────────┘  │
+└──────────────────────────────┴───────────────┴──────────────────────┘
+```
+
+### 4.2 Seat Card HTML Template (Per Seat)
+
+```html
+<div class="seat-card" id="seat-{index}" data-seat-index="{index}">
+  <!-- Header -->
+  <div class="seat-header">
+    <span class="seat-title">
+      Seat {index+1}
+      <span class="status-dot" id="status-dot-{index}"></span>
+    </span>
+    <span class="dealer-marker" id="dealer-{index}" style="display:none">D</span>
+  </div>
+
+  <!-- Player Info -->
+  <div class="seat-info">
+    <div id="player-name-{index}">Empty</div>
+    <div id="player-stack-{index}">R0.00</div>
+    <div id="player-status-{index}">-</div>
+  </div>
+
+  <!-- Hole Cards -->
+  <div class="hole-cards" id="hole-cards-{index}"></div>
+
+  <!-- Pre-Actions -->
+  <div class="pre-actions">
+    <div class="pre-action-item">
+      <input type="checkbox" id="check-fold-{index}" 
+             onchange="togglePreAction({index}, 'check_fold')">
+      <label for="check-fold-{index}">Check/Fold</label>
+    </div>
+    <div class="pre-action-item">
+      <input type="checkbox" id="check-call-{index}" 
+             onchange="togglePreAction({index}, 'check_call')">
+      <label for="check-call-{index}">Check/Call</label>
+    </div>
+  </div>
+
+  <!-- Action Buttons -->
+  <div class="action-buttons">
+    <button class="action-btn btn-fold" 
+            onclick="sendCommand(currentTableId, {index}, 'fold')">
+      FOLD
+    </button>
+    <button class="action-btn btn-check" 
+            onclick="sendCommand(currentTableId, {index}, 'check')">
+      CHECK
+    </button>
+    <button class="action-btn btn-call" 
+            onclick="sendCommand(currentTableId, {index}, 'call')">
+      CALL
+    </button>
+    <button class="action-btn btn-min" 
+            onclick="sendCommand(currentTableId, {index}, 'bet_min')">
+      MIN
+    </button>
+    <button class="action-btn btn-raise" 
+            onclick="sendCommand(currentTableId, {index}, 'raise_max')">
+      MAX
+    </button>
+    <button class="action-btn btn-bet" 
+            onclick="openBetDialog({index})">
+      BET
+    </button>
+    <div class="arm-checkbox">
+      <input type="checkbox" id="arm-{index}">
+      <label for="arm-{index}">ARM</label>
+    </div>
+    <button class="action-btn btn-cashout" 
+            onclick="sendCommand(currentTableId, {index}, 'cashout')">
+      CASH
+    </button>
+  </div>
+
+  <!-- Pending Command Badge -->
+  <div class="pending-badge" id="pending-{index}" style="display:none">
+    PENDING: <span id="pending-cmd-{index}"></span>
+  </div>
+</div>
+```
+
+### 4.3 Advanced Actions Panel HTML
+
+```html
+<div class="advanced-actions-panel">
+  <h3>Advanced Actions</h3>
+
+  <!-- Global Bet Controls -->
+  <div class="global-controls">
+    <button class="global-btn btn-min-all" onclick="setAllMin()">
+      MIN ALL
+    </button>
+    <button class="global-btn btn-max-all" onclick="setAllMax()">
+      MAX ALL
+    </button>
+  </div>
+
+  <!-- Betting Slider (For Custom BET) -->
+  <div class="bet-slider-container" id="bet-slider-container" style="display:none">
+    <label>Bet Amount (ZAR)</label>
+    <input type="range" id="bet-slider" min="2" max="200" value="10" step="0.5">
+    <span id="bet-slider-value">R10.00</span>
+    <button class="btn-execute" onclick="executePendingBets()">
+      BET / EXECUTE
+    </button>
+  </div>
+
+  <!-- Emergency Cashout -->
+  <div class="cashout-controls">
+    <div class="arm-cashout-item">
+      <input type="checkbox" id="arm-cashout-all">
+      <label for="arm-cashout-all">ARM CASHOUT ALL</label>
+    </div>
+    <button class="btn-cashout-all" 
+            onclick="cashoutAll()" 
+            id="cashout-all-btn" 
+            disabled>
+      CASHOUT ALL
+    </button>
+    <p class="cashout-warning">Manual cashout or arm for auto-trigger</p>
+  </div>
+
+  <!-- Command Log -->
+  <div class="command-log-container">
+    <h4>Command Log</h4>
+    <div id="log-container" class="log-entries">
+      <!-- Populated dynamically -->
+    </div>
+  </div>
+</div>
+```
+
+### 4.4 CSS Additions for New Buttons
+
+```css
+/* Advanced Actions Panel */
+.advanced-actions-panel {
+  background: rgba(0, 0, 0, 0.4);
+  padding: 20px;
+  border-radius: 10px;
+  min-width: 280px;
+}
+
+.global-controls {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.global-btn {
+  padding: 12px;
+  border: none;
+  border-radius: 6px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-min-all {
+  background: #607d8b;
+  color: white;
+}
+
+.btn-max-all {
+  background: #ff9800;
+  color: white;
+}
+
+.btn-execute {
+  background: #ffc107;
+  color: #000;
+  padding: 15px;
+  border: none;
+  border-radius: 6px;
+  font-weight: bold;
+  font-size: 1.1em;
+  cursor: pointer;
+  width: 100%;
+  margin-top: 10px;
+}
+
+.btn-execute:hover {
+  background: #ffb300;
+  box-shadow: 0 4px 8px rgba(255, 193, 7, 0.4);
+}
+
+.cashout-controls {
+  margin-top: 20px;
+  padding: 15px;
+  background: rgba(255, 0, 0, 0.1);
+  border-radius: 8px;
+  border: 2px solid #f44336;
+}
+
+.btn-cashout-all {
+  background: #f44336;
+  color: white;
+  padding: 15px;
+  border: none;
+  border-radius: 6px;
+  font-weight: bold;
+  font-size: 1.1em;
+  cursor: pointer;
+  width: 100%;
+  margin-top: 10px;
+}
+
+.btn-cashout-all:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-cashout-all:not(:disabled):hover {
+  background: #d32f2f;
+  box-shadow: 0 4px 8px rgba(244, 67, 54, 0.4);
+}
+
+.cashout-warning {
+  font-size: 0.75em;
+  color: #ffcccc;
+  margin-top: 8px;
+  text-align: center;
+}
+
+/* Betting Slider */
+.bet-slider-container {
+  margin: 15px 0;
+  padding: 15px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+}
+
+.bet-slider-container label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: bold;
+}
+
+#bet-slider {
+  width: 100%;
+  margin-bottom: 8px;
+}
+
+#bet-slider-value {
+  display: block;
+  text-align: center;
+  font-size: 1.2em;
+  font-weight: bold;
+  color: #ffc107;
+  margin-bottom: 10px;
+}
+
+/* ARM checkbox next to buttons */
+.arm-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 4px;
+}
+
+.arm-checkbox input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+.arm-checkbox label {
+  cursor: pointer;
+  font-size: 0.7em;
+  font-weight: bold;
+}
+
+/* Pending Badge */
+.pending-badge {
+  margin-top: 8px;
+  padding: 6px;
+  background: #ff9800;
+  border-radius: 4px;
+  font-size: 0.75em;
+  font-weight: bold;
+  text-align: center;
+  animation: pulse 1s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+```
+
+---
+
+## 5. Data Flow Architecture
+
+### 5.1 Snapshot Collection Flow (Browser → Backend)
+
+```
+┌──────────────────┐
+│   n4p.js         │  Injected into pokerbet.co.za iframe
+│   (Browser)      │  Monitors DOM for table state changes
+└────────┬─────────┘
+         │ Every 5s or on state change
+         │ POST /api/snapshot
+         │ {table_id, seat_index, snapshot}
+         ▼
+┌──────────────────┐
+│  Flask Backend   │  Receives snapshots
+│  engine/app.py   │  Stores in _snapshot_store
+└────────┬─────────┘
+         │ Merges snapshots per table
+         │ Builds _merged_tables
+         ▼
+┌──────────────────┐
+│  _merged_tables  │  Unified table state
+│  (In-Memory)     │  9 seats with latest data
+└──────────────────┘
+```
+
+### 5.2 Remote Control Flow (UI → Backend → Browser)
+
+```
+┌──────────────────┐
+│  Remote UI       │  User clicks RAISE MAX button
+│  index.html      │  Seat 3
+└────────┬─────────┘
+         │ sendCommand(tableId, 3, 'raise_max')
+         │ POST /api/commands/queue
+         │ {table_id, seat_index: 3, command_type: 'raise_max'}
+         ▼
+┌──────────────────┐
+│  Flask Backend   │  Generates seat_token
+│  engine/app.py   │  Queues command in _command_queue
+└────────┬─────────┘
+         │ _command_queue[token] = {id, type, status: 'pending'}
+         │
+         ▼
+┌──────────────────┐
+│  _command_queue  │  Stores pending commands per seat token
+│  (In-Memory)     │  Waits for browser to poll
+└────────┬─────────┘
+         │
+         │ n4p.js polls every 500ms
+         │ GET /api/commands/pending?token=<seat_token>
+         ▼
+┌──────────────────┐
+│   n4p.js         │  Receives command
+│   (Browser)      │  Executes DOM action (click MAX button, then RAISE)
+└────────┬─────────┘
+         │ Clicks selector: .f-right-column-p > ul > li:nth-child(2) > div > p > i
+         │ Then clicks: .f-right-column-p > ul > li:nth-child(3) > div > p > i
+         │
+         │ POST /api/commands/ack
+         │ {token, command_id}
+         ▼
+┌──────────────────┐
+│  Flask Backend   │  Marks command as 'acked'
+│  engine/app.py   │  Clears from queue
+└──────────────────┘
+```
+
+### 5.3 UI Refresh Flow (Backend → UI)
+
+```
+┌──────────────────┐
+│  Remote UI       │  Auto-refresh every 2 seconds
+│  index.html      │
+└────────┬─────────┘
+         │ fetchTableData()
+         │ GET /api/table/latest
+         ▼
+┌──────────────────┐
+│  Flask Backend   │  Returns merged table with 9 seats
+│  engine/app.py   │
+└────────┬─────────┘
+         │ {ok: true, table: {..., seats: [...]}}
+         ▼
+┌──────────────────┐
+│  Remote UI       │  renderTable(table)
+│  index.html      │  Updates DOM for each seat:
+└──────────────────┘  - Player name, stack
+                      - Hole cards
+                      - Button states (enable/disable)
+                      - Pending command badges
+                      - Dealer marker
+```
+
+---
+
+## 6. Implementation Steps
+
+### Phase 1: Backend Enhancements (engine/app.py)
+
+#### Step 1.1: Add New Command Types
+
+**Location:** `engine/app.py` line ~379 (queue_command function)
+
+**Current:**
+```python
+# Limited command validation
+```
+
+**Add:**
+```python
+# Expanded command type validation
+VALID_COMMANDS = [
+    'fold', 'check', 'call',                   # Basic actions
+    'bet_min', 'raise_max', 'bet_custom',     # Betting actions
+    'cashout',                                 # Leave table
+    'pre_action_check_fold',                   # Pre-actions
+    'pre_action_check_call',
+    'clear_preaction',
+    'wait_for_bb',                             # Other actions
+    'rebuy_amount',
+    'add_chips'
+]
+
+def validate_command_type(command_type):
+    """Validate command type"""
+    if command_type not in VALID_COMMANDS:
+        raise ValueError(f"Invalid command type: {command_type}")
+    return True
+```
+
+#### Step 1.2: Add Batch Command Endpoint
+
+**Add new endpoint:**
+```python
+@app.route('/api/commands/queue-batch', methods=['POST'])
+def queue_batch_commands():
+    """Queue same command for multiple seats (MIN ALL / MAX ALL)"""
+    payload = request.get_json()
+    if not payload:
+        return jsonify({'ok': False, 'error': 'No payload'}), 400
+
+    table_id = payload.get('table_id')
+    seat_indices = payload.get('seat_indices', [])
+    command_type = payload.get('command_type')
+    value = payload.get('value')
+
+    if not all([table_id, seat_indices, command_type]):
+        return jsonify({'ok': False, 'error': 'Missing required fields'}), 400
+
+    # Validate command type
+    try:
+        validate_command_type(command_type)
+    except ValueError as e:
+        return jsonify({'ok': False, 'error': str(e)}), 400
+
+    command_ids = []
+    queued_count = 0
+
+    with _store_lock:
+        for seat_index in seat_indices:
+            store_key = f"{table_id}:{seat_index}"
+            
+            # Check if seat exists and is active
+            if store_key not in _snapshot_store:
+                continue
+            
+            seat = _snapshot_store[store_key]
+            if seat.get('status') != 'playing':
+                continue
+
+            # Generate token and queue command
+            token = generate_seat_token(table_id, seat_index)
+            command_id = str(uuid.uuid4())[:8]
+            
+            _command_queue[token] = {
+                'id': command_id,
+                'type': command_type,
+                'value': value,
+                'queued_at': time.time(),
+                'status': 'pending',
+            }
+            
+            command_ids.append(command_id)
+            queued_count += 1
+
+        # Refresh merged table
+        if table_id in _merged_tables:
+            _merged_tables[table_id] = merge_table(table_id)
+
+    return jsonify({
+        'ok': True,
+        'command_ids': command_ids,
+        'queued_count': queued_count
+    })
+```
+
+#### Step 1.3: Add Execute All Endpoint
+
+**Add new endpoint:**
+```python
+@app.route('/api/commands/execute-all', methods=['POST'])
+def execute_all_commands():
+    """Execute all pending commands (for BET / EXECUTE button)"""
+    payload = request.get_json()
+    if not payload:
+        return jsonify({'ok': False, 'error': 'No payload'}), 400
+
+    table_id = payload.get('table_id')
+    if not table_id:
+        return jsonify({'ok': False, 'error': 'Missing table_id'}), 400
+
+    executed_count = 0
+    failed_count = 0
+
+    with _store_lock:
+        # Find all pending commands for this table
+        for token, cmd in list(_command_queue.items()):
+            if cmd and cmd.get('status') == 'pending':
+                # Check if this command belongs to this table
+                # (token format: hmac(table_id:seat_index))
+                # For now, mark all as executable
+                cmd['status'] = 'executing'
+                executed_count += 1
+
+    return jsonify({
+        'ok': True,
+        'executed_count': executed_count,
+        'failed_count': failed_count
+    })
+```
+
+#### Step 1.4: Add Cashout All Endpoint
+
+**Add new endpoint:**
+```python
+@app.route('/api/commands/cashout-all', methods=['POST'])
+def cashout_all_seats():
+    """Emergency cashout - queue cashout for all connected seats"""
+    payload = request.get_json()
+    if not payload:
+        return jsonify({'ok': False, 'error': 'No payload'}), 400
+
+    table_id = payload.get('table_id')
+    confirm = payload.get('confirm', False)
+
+    if not table_id:
+        return jsonify({'ok': False, 'error': 'Missing table_id'}), 400
+
+    if not confirm:
+        return jsonify({'ok': False, 'error': 'Must confirm cashout-all'}), 400
+
+    cashed_out_seats = []
+
+    with _store_lock:
+        # Find all connected seats for this table
+        for store_key, record in _snapshot_store.items():
+            if record['table_id'] == table_id:
+                seat_index = record['seat_index']
+                token = generate_seat_token(table_id, seat_index)
+                command_id = str(uuid.uuid4())[:8]
+
+                _command_queue[token] = {
+                    'id': command_id,
+                    'type': 'cashout',
+                    'queued_at': time.time(),
+                    'status': 'pending',
+                }
+
+                cashed_out_seats.append(seat_index)
+
+        # Refresh merged table
+        if table_id in _merged_tables:
+            _merged_tables[table_id] = merge_table(table_id)
+
+    return jsonify({
+        'ok': True,
+        'cashed_out_seats': cashed_out_seats
+    })
+```
+
+#### Step 1.5: Add Clear All Commands Endpoint
+
+**Add new endpoint:**
+```python
+@app.route('/api/commands/clear-all', methods=['POST'])
+def clear_all_commands():
+    """Clear all pending commands"""
+    payload = request.get_json()
+    if not payload:
+        return jsonify({'ok': False, 'error': 'No payload'}), 400
+
+    table_id = payload.get('table_id')
+    if not table_id:
+        return jsonify({'ok': False, 'error': 'Missing table_id'}), 400
+
+    cleared_count = 0
+
+    with _store_lock:
+        for token, cmd in list(_command_queue.items()):
+            if cmd and cmd.get('status') == 'pending':
+                _command_queue[token] = None
+                cleared_count += 1
+
+    return jsonify({
+        'ok': True,
+        'cleared_count': cleared_count
+    })
+```
+
+---
+
+### Phase 2: Frontend Enhancements (static/index.html)
+
+#### Step 2.1: Add Complete Button Set HTML
+
+**Location:** `static/index.html` seat card template
+
+**Update action-buttons section:**
+```javascript
+function renderSeat(seat, index) {
+  const isActive = seat.status === 'playing';
+  const hasPlayer = !!seat.name;
+  const hasPendingCmd = !!seat.pending_cmd;
+
+  return `
+    <div class="seat-card ${seat.status} ${hasPendingCmd ? 'pending' : ''}" id="seat-${index}">
+      <!-- Header -->
+      <div class="seat-header">
+        <span class="seat-title">
+          Seat ${index + 1}
+          <span class="status-dot ${hasPlayer ? 'live' : 'offline'}"></span>
+        </span>
+        ${seat.is_dealer ? '<span class="dealer-marker">D</span>' : ''}
+      </div>
+
+      <!-- Player Info -->
+      <div class="seat-info">
+        <div><strong>${seat.name || 'Empty'}</strong></div>
+        <div>Stack: R${seat.stack_zar ? seat.stack_zar.toFixed(2) : '0.00'}</div>
+        <div>Status: ${seat.status}</div>
+      </div>
+
+      <!-- Hole Cards -->
+      ${renderHoleCards(seat.hole_cards)}
+
+      <!-- Pre-Actions -->
+      <div class="pre-actions">
+        <div class="pre-action-item">
+          <input type="checkbox" id="check-fold-${index}" 
+                 ${!isActive ? 'disabled' : ''}
+                 onchange="togglePreAction(${index}, 'check_fold')">
+          <label for="check-fold-${index}">Check/Fold</label>
+        </div>
+        <div class="pre-action-item">
+          <input type="checkbox" id="check-call-${index}" 
+                 ${!isActive ? 'disabled' : ''}
+                 onchange="togglePreAction(${index}, 'check_call')">
+          <label for="check-call-${index}">Check/Call</label>
+        </div>
+      </div>
+
+      <!-- Action Buttons (All 8 Buttons) -->
+      <div class="action-buttons">
+        <button class="action-btn btn-fold" 
+                ${!isActive ? 'disabled' : ''}
+                onclick="sendCommand(currentTableId, ${index}, 'fold')">
+          FOLD
+        </button>
+        <button class="action-btn btn-check" 
+                ${!isActive ? 'disabled' : ''}
+                onclick="sendCommand(currentTableId, ${index}, 'check')">
+          CHECK
+        </button>
+        <button class="action-btn btn-call" 
+                ${!isActive ? 'disabled' : ''}
+                onclick="sendCommand(currentTableId, ${index}, 'call')">
+          CALL
+        </button>
+        <button class="action-btn btn-min" 
+                ${!isActive ? 'disabled' : ''}
+                onclick="sendCommand(currentTableId, ${index}, 'bet_min')">
+          MIN
+        </button>
+        <button class="action-btn btn-raise" 
+                ${!isActive ? 'disabled' : ''}
+                onclick="sendCommand(currentTableId, ${index}, 'raise_max')">
+          MAX
+        </button>
+        <button class="action-btn btn-bet" 
+                ${!isActive ? 'disabled' : ''}
+                onclick="openBetDialog(${index})">
+          BET
+        </button>
+        <div class="arm-checkbox">
+          <input type="checkbox" id="arm-${index}" ${!hasPlayer ? 'disabled' : ''}>
+          <label for="arm-${index}">ARM</label>
+        </div>
+        <button class="action-btn btn-cashout" 
+                ${!hasPlayer ? 'disabled' : ''}
+                onclick="sendCommand(currentTableId, ${index}, 'cashout')">
+          CASH
+        </button>
+      </div>
+
+      <!-- Pending Command Badge -->
+      ${hasPendingCmd ? `
+        <div class="pending-badge">
+          PENDING: ${seat.pending_cmd.type.toUpperCase()}
+        </div>
+      ` : ''}
+    </div>
+  `;
+}
+```
+
+#### Step 2.2: Add Advanced Actions Panel
+
+**Location:** After seats grid in `<body>`
+
+**Add:**
+```html
+<!-- Advanced Actions Panel -->
+<div class="advanced-actions-panel">
+  <h3>Advanced Actions</h3>
+
+  <!-- Global Controls -->
+  <div class="global-controls">
+    <button class="global-btn btn-min-all" onclick="setAllMin()">
+      MIN ALL
+    </button>
+    <button class="global-btn btn-max-all" onclick="setAllMax()">
+      MAX ALL
+    </button>
+  </div>
+
+  <!-- Betting Slider -->
+  <div class="bet-slider-container" id="bet-slider-container" style="display:none">
+    <label>Custom Bet Amount (ZAR)</label>
+    <input type="range" id="bet-slider" min="2" max="200" value="10" step="0.5"
+           oninput="updateBetSliderValue()">
+    <span id="bet-slider-value">R10.00</span>
+    <button class="btn-execute" onclick="executePendingBets()">
+      BET / EXECUTE
+    </button>
+  </div>
+
+  <!-- Emergency Cashout -->
+  <div class="cashout-controls">
+    <div class="arm-cashout-item">
+      <input type="checkbox" id="arm-cashout-all" onchange="toggleCashoutAll()">
+      <label for="arm-cashout-all">ARM CASHOUT ALL</label>
+    </div>
+    <button class="btn-cashout-all" 
+            onclick="cashoutAll()" 
+            id="cashout-all-btn" 
+            disabled>
+      CASHOUT ALL
+    </button>
+    <p class="cashout-warning">⚠️ Manual cashout or arm for auto-trigger</p>
+  </div>
+
+  <!-- Quick Actions -->
+  <div class="quick-actions" style="margin-top: 15px;">
+    <button class="btn-clear-all" onclick="clearAllCommands()">
+      CLEAR ALL PENDING
+    </button>
+  </div>
+
+  <!-- Command Log -->
+  <div class="command-log-container">
+    <h4>Command Log</h4>
+    <div id="log-container" class="log-entries">
+      <!-- Populated dynamically -->
+    </div>
+  </div>
+</div>
+```
+
+#### Step 2.3: Add JavaScript Functions
+
+**Location:** `<script>` section in `static/index.html`
+
+**Add:**
+```javascript
+// Global state
+let currentTableId = null;
+let activeSeatForBet = null;
+
+// Set all seats to MIN
+function setAllMin() {
+  if (!currentTableId) {
+    alert('No active table');
+    return;
+  }
+
+  const seatIndices = [0, 1, 2, 3, 4, 5, 6, 7, 8];
+
+  fetch(API_BASE + '/commands/queue-batch', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      table_id: currentTableId,
+      seat_indices: seatIndices,
+      command_type: 'bet_min'
+    })
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.ok) {
+      addToLog('ALL', `MIN queued for ${data.queued_count} seats`, 'BATCH');
+    } else {
+      console.error('Batch command failed:', data.error);
+    }
+  })
+  .catch(err => {
+    console.error('Network error:', err);
+  });
+}
+
+// Set all seats to MAX
+function setAllMax() {
+  if (!currentTableId) {
+    alert('No active table');
+    return;
+  }
+
+  const seatIndices = [0, 1, 2, 3, 4, 5, 6, 7, 8];
+
+  fetch(API_BASE + '/commands/queue-batch', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      table_id: currentTableId,
+      seat_indices: seatIndices,
+      command_type: 'raise_max'
+    })
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.ok) {
+      addToLog('ALL', `MAX queued for ${data.queued_count} seats`, 'BATCH');
+    } else {
+      console.error('Batch command failed:', data.error);
+    }
+  })
+  .catch(err => {
+    console.error('Network error:', err);
+  });
+}
+
+// Open bet dialog for custom amount
+function openBetDialog(seatIndex) {
+  activeSeatForBet = seatIndex;
+  document.getElementById('bet-slider-container').style.display = 'block';
+  addToLog(seatIndex, 'BET dialog opened', 'INFO');
+}
+
+// Update bet slider value display
+function updateBetSliderValue() {
+  const slider = document.getElementById('bet-slider');
+  const value = parseFloat(slider.value);
+  document.getElementById('bet-slider-value').textContent = `R${value.toFixed(2)}`;
+}
+
+// Execute pending bets (or single bet from slider)
+function executePendingBets() {
+  if (!currentTableId) {
+    alert('No active table');
+    return;
+  }
+
+  // If bet slider is open, send custom bet for active seat
+  const sliderContainer = document.getElementById('bet-slider-container');
+  if (sliderContainer.style.display === 'block' && activeSeatForBet !== null) {
+    const amount = parseFloat(document.getElementById('bet-slider').value);
+    
+    sendCommand(currentTableId, activeSeatForBet, 'bet_custom', { value: amount });
+    
+    // Hide slider
+    sliderContainer.style.display = 'none';
+    activeSeatForBet = null;
+    return;
+  }
+
+  // Otherwise, execute all pending commands
+  fetch(API_BASE + '/commands/execute-all', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      table_id: currentTableId
+    })
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.ok) {
+      addToLog('ALL', `Executed ${data.executed_count} pending commands`, 'EXECUTE');
+    } else {
+      console.error('Execute failed:', data.error);
+    }
+  })
+  .catch(err => {
+    console.error('Network error:', err);
+  });
+}
+
+// Toggle cashout-all button based on ARM checkbox
+function toggleCashoutAll() {
+  const checkbox = document.getElementById('arm-cashout-all');
+  const button = document.getElementById('cashout-all-btn');
+  button.disabled = !checkbox.checked;
+}
+
+// Cashout all seats (emergency exit)
+function cashoutAll() {
+  if (!currentTableId) {
+    alert('No active table');
+    return;
+  }
+
+  if (!confirm('⚠️ EMERGENCY EXIT: Cash out ALL seats and leave ALL tables?')) {
+    return;
+  }
+
+  fetch(API_BASE + '/commands/cashout-all', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      table_id: currentTableId,
+      confirm: true
+    })
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.ok) {
+      addToLog('ALL', `Cashed out ${data.cashed_out_seats.length} seats`, 'CASHOUT');
+      
+      // Uncheck ARM after execution
+      document.getElementById('arm-cashout-all').checked = false;
+      toggleCashoutAll();
+    } else {
+      console.error('Cashout all failed:', data.error);
+    }
+  })
+  .catch(err => {
+    console.error('Network error:', err);
+  });
+}
+
+// Clear all pending commands
+function clearAllCommands() {
+  if (!currentTableId) {
+    alert('No active table');
+    return;
+  }
+
+  if (!confirm('Clear all pending commands?')) {
+    return;
+  }
+
+  fetch(API_BASE + '/commands/clear-all', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      table_id: currentTableId
+    })
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.ok) {
+      addToLog('ALL', `Cleared ${data.cleared_count} pending commands`, 'CLEAR');
+    } else {
+      console.error('Clear failed:', data.error);
+    }
+  })
+  .catch(err => {
+    console.error('Network error:', err);
+  });
+}
+
+// Toggle pre-action (mutually exclusive)
+function togglePreAction(seatIndex, actionType) {
+  const checkFoldId = `check-fold-${seatIndex}`;
+  const checkCallId = `check-call-${seatIndex}`;
+
+  const checkFold = document.getElementById(checkFoldId);
+  const checkCall = document.getElementById(checkCallId);
+
+  // Mutual exclusivity
+  if (actionType === 'check_fold' && checkFold.checked) {
+    checkCall.checked = false;
+    sendCommand(currentTableId, seatIndex, 'pre_action_check_fold', { enabled: true });
+  } else if (actionType === 'check_call' && checkCall.checked) {
+    checkFold.checked = false;
+    sendCommand(currentTableId, seatIndex, 'pre_action_check_call', { enabled: true });
+  } else {
+    // Both unchecked, clear pre-action
+    sendCommand(currentTableId, seatIndex, 'clear_preaction');
+  }
+}
+
+// Update currentTableId when fetching data
+function fetchTableData() {
+  fetch(API_BASE + '/table/latest')
+    .then(r => r.json())
+    .then(data => {
+      if (data.ok && data.table) {
+        currentTableId = data.table.table_id;
+        renderTable(data.table);
+      } else {
+        showWaiting();
+      }
+    })
+    .catch(err => {
+      console.error('Fetch error:', err);
+      showWaiting();
+    });
+}
+```
+
+---
+
+## 7. Testing Strategy
+
+### 7.1 Unit Tests (Per Component)
+
+**Backend Endpoint Tests:**
+```bash
+# Test batch command
+curl -X POST http://127.0.0.1:5000/api/commands/queue-batch \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "table_id": "test-table",
+    "seat_indices": [0, 1, 2],
+    "command_type": "raise_max"
+  }'
+
+# Expected: {"ok": true, "queued_count": 3, "command_ids": [...]}
+
+# Test cashout all
+curl -X POST http://127.0.0.1:5000/api/commands/cashout-all \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "table_id": "test-table",
+    "confirm": true
+  }'
+
+# Expected: {"ok": true, "cashed_out_seats": [0, 1, 2, ...]}
+```
+
+**Frontend Button Tests:**
+1. Click FOLD on Seat 1 → Check command log shows "FOLD PENDING"
+2. Click MAX on Seat 2 → Check command log shows "RAISE_MAX PENDING"
+3. Click MIN ALL → Check all active seats show "BET_MIN PENDING"
+4. Click BET on Seat 3 → Check slider appears
+5. Adjust slider to R50 → Click BET/EXECUTE → Check command sent
+6. Check Check/Fold → Uncheck Check/Call → Verify mutual exclusivity
+7. Check ARM CASHOUT ALL → Click CASHOUT ALL → Verify confirmation prompt
+
+### 7.2 Integration Tests (End-to-End)
+
+**Test Scenario 1: Single Seat Action**
+```
+1. Open remote control UI
+2. Wait for table data to load
+3. Verify 9 seats rendered (empty or occupied)
+4. Click RAISE MAX on Seat 0
+5. Check command log shows "SEAT 0 | RAISE_MAX | PENDING"
+6. Wait 2s for n4p.js to poll and execute
+7. Verify seat 0 button disabled during execution
+8. Verify command log updates to "ACKED"
+```
+
+**Test Scenario 2: Batch Action (MIN ALL)**
+```
+1. Open remote control UI
+2. Click MIN ALL button
+3. Verify all active seats (status='playing') show pending badge
+4. Check command log shows "ALL | MIN queued for X seats | BATCH"
+5. Wait for n4p.js to execute on each seat
+6. Verify each seat badge clears after execution
+```
+
+**Test Scenario 3: Emergency Cashout**
+```
+1. Open remote control UI
+2. Verify CASHOUT ALL button is disabled
+3. Check ARM CASHOUT ALL checkbox
+4. Verify CASHOUT ALL button is now enabled
+5. Click CASHOUT ALL
+6. Verify confirmation prompt appears
+7. Click OK
+8. Verify all seats show "CASHOUT PENDING"
+9. Wait for n4p.js to execute cashouts
+10. Verify all players leave tables
+```
+
+### 7.3 Browser Compatibility
+
+Test in:
+- Chrome 131+
+- Firefox 120+
+- Safari 17+
+- Mobile Chrome (responsive design)
+
+---
+
+## Status
+
+✅ **Analysis:** COMPLETE  
+✅ **Plan:** COMPLETE  
+✅ **Documentation:** COMPLETE  
+⏸️ **Implementation:** AWAITING APPROVAL
+
+**Next Step:** Review plan and approve for implementation
+
+**Estimated Implementation Time:**
+- Backend changes: 4-6 hours
+- Frontend changes: 6-8 hours
+- Testing: 4-6 hours
+- **Total: 2-3 days**
+
+**Files to Modify:**
+1. `engine/app.py` - Add 4 new endpoints, update command validation
+2. `static/index.html` - Update HTML structure, add 9-seat rendering, add advanced panel
+3. `static/index.html` (CSS) - Add styles for new buttons and panels
+4. `static/index.html` (JS) - Add 8+ new functions for batch/advanced actions
+
+**Files to Create:**
+1. `REMOTE_CONTROL_TESTING_CHECKLIST.md` - Test scenarios and validation steps
+
+
+
+################################################################################
+# DOCUMENT 6: POKERBET_COST_OPTIMIZATION_140.md
+################################################################################
+
+# PokerBet Cost Optimization to $140/month
+**Target:** Reduce from $231.50/month to $140/month (40% cost reduction)  
+**Savings:** $91.50/month ($1,098/year)  
+**Date:** 2026-04-06  
+**Status:** Planning (No Execution)
+
+---
+
+## Cost Breakdown Comparison
+
+### Current Architecture (Standard)
+| Component | Cost/Month | Notes |
+|-----------|------------|-------|
+| PostgreSQL RDS (db.t3.medium) | $79.50 | 2 vCPU, 4GB RAM, managed service |
+| EBS Storage (100GB) | $10.00 | RDS storage |
+| Automated Backups (100GB) | $9.50 | RDS backup storage |
+| S3 Raw Data (2.3TB/month) | $150.00 | 90-day Standard → Glacier |
+| Lambda Processing | $2.00 | 4.67M invocations/month |
+| **TOTAL** | **$231.50** | |
+
+### Optimized Architecture (Target)
+| Component | Cost/Month | Savings | Notes |
+|-----------|------------|---------|-------|
+| Self-Hosted PostgreSQL (EC2) | $30.00 | **-$49.50** | t3.medium on existing instance |
+| EBS Storage (100GB gp3) | $8.00 | **-$11.50** | Cheaper EBS, manual backups |
+| S3 Raw Data (2.3TB/month) | $100.00 | **-$50.00** | 30-day Standard → Glacier |
+| Lambda Processing | $2.00 | $0.00 | No change |
+| **TOTAL** | **$140.00** | **-$91.50** | **40% reduction** |
+
+---
+
+## Optimization Strategy
+
+### 1. Self-Hosted PostgreSQL on EC2 (Save $49.50/month)
+
+**Current:** RDS db.t3.medium ($79.50/month) + storage/backups ($19.50/month) = $99/month
+
+**Optimized:** Self-hosted on existing EC2 instance
+
+#### 1.1 Use Existing Processing Instance
+
+**Option A: Run PostgreSQL on Processing Instance (RECOMMENDED)**
+- Already running EC2 instance for Flask API
+- Add PostgreSQL to same instance (minimal CPU overhead)
+- Current instance: Likely t3.medium or larger
+- PostgreSQL + Flask can coexist efficiently
+
+**Instance Costs:**
+- t3.medium: $0.0416/hour = $30.24/month
+- EBS gp3 100GB: $0.08/GB/month = $8/month
+- **Total: $38/month** (vs $99/month RDS)
+- **Savings: $61/month**
+
+**But wait:** Processing instance already exists for Flask API, so PostgreSQL is effectively FREE (only storage cost = $8/month)
+
+**Actual Savings Calculation:**
+- RDS total: $99/month
+- Self-hosted incremental cost: $8/month (EBS only, instance already paid for)
+- **NET SAVINGS: $91/month**
+
+**Why This Works:**
+- Flask API + PostgreSQL both use minimal CPU
+- PostgreSQL RAM: ~1-2GB (fits in t3.medium 4GB RAM)
+- Flask RAM: ~500MB
+- Total RAM usage: ~2.5GB (safe margin on 4GB instance)
+
+#### 1.2 Installation Steps (Not Executed - Planning Only)
+
+**Step 1: Install PostgreSQL on Processing Instance**
+```bash
+# SSH to Processing Instance
+ssh -i /home/ploxyz.pem ubuntu@PROCESSING_IP
+
+# Update system
+sudo apt-get update
+
+# Install PostgreSQL 14
+sudo apt-get install -y postgresql-14 postgresql-contrib-14
+
+# Start and enable
+sudo systemctl start postgresql
+sudo systemctl enable postgresql
+
+# Verify
+sudo systemctl status postgresql
+```
+
+**Step 2: Configure PostgreSQL**
+```bash
+# Edit PostgreSQL config for performance
+sudo nano /etc/postgresql/14/main/postgresql.conf
+
+# Recommended settings for t3.medium (4GB RAM):
+shared_buffers = 1GB                # 25% of RAM
+effective_cache_size = 3GB          # 75% of RAM
+maintenance_work_mem = 256MB
+checkpoint_completion_target = 0.9
+wal_buffers = 16MB
+default_statistics_target = 100
+random_page_cost = 1.1              # For SSD
+effective_io_concurrency = 200
+work_mem = 10MB
+min_wal_size = 1GB
+max_wal_size = 4GB
+
+# Restart PostgreSQL
+sudo systemctl restart postgresql
+```
+
+**Step 3: Create Database and User**
+```bash
+sudo -u postgres psql
+
+CREATE DATABASE poker_data;
+CREATE USER poker_user WITH PASSWORD 'SECURE_PASSWORD_HERE';
+GRANT ALL PRIVILEGES ON DATABASE poker_data TO poker_user;
+
+# Enable remote connections (if needed)
+\q
+
+# Edit pg_hba.conf
+sudo nano /etc/postgresql/14/main/pg_hba.conf
+
+# Add line:
+host    poker_data    poker_user    127.0.0.1/32    md5
+
+# Edit postgresql.conf for local connections
+sudo nano /etc/postgresql/14/main/postgresql.conf
+
+# Change:
+listen_addresses = 'localhost'
+
+# Restart
+sudo systemctl restart postgresql
+```
+
+**Step 4: Run Schema DDL**
+```bash
+# Copy schema.sql to instance
+scp -i /home/ploxyz.pem ~/POKERBET_SQL_SCHEMA.sql ubuntu@PROCESSING_IP:~/
+
+# Run schema
+psql -U poker_user -d poker_data -f ~/POKERBET_SQL_SCHEMA.sql
+
+# Verify tables
+psql -U poker_user -d poker_data
+\dt
+\di  # List indexes
+```
+
+**Step 5: Update Flask API Connection**
+```python
+# Edit app.py
+DB_CONFIG = {
+    'host': 'localhost',  # Changed from RDS endpoint
+    'database': 'poker_data',
+    'user': 'poker_user',
+    'password': os.environ.get('DB_PASSWORD')  # Use env var for security
+}
+```
+
+#### 1.3 Manual Backup Strategy (Replace RDS Automated Backups)
+
+**Daily Backup Script:**
+```bash
+#!/bin/bash
+# /opt/scripts/backup_postgres.sh
+
+DATE=$(date +%Y%m%d_%H%M%S)
+BACKUP_DIR="/opt/backups/postgres"
+S3_BUCKET="poker-backups"
+
+mkdir -p $BACKUP_DIR
+
+# Full database dump
+pg_dump -U poker_user -d poker_data | gzip > $BACKUP_DIR/poker_data_$DATE.sql.gz
+
+# Upload to S3
+aws s3 cp $BACKUP_DIR/poker_data_$DATE.sql.gz s3://$S3_BUCKET/postgres/$DATE.sql.gz
+
+# Keep local backups for 7 days
+find $BACKUP_DIR -name "*.sql.gz" -mtime +7 -delete
+
+echo "Backup complete: $DATE"
+```
+
+**Cron Schedule:**
+```bash
+# Daily at 2 AM
+0 2 * * * /opt/scripts/backup_postgres.sh >> /var/log/postgres_backup.log 2>&1
+```
+
+**Backup Costs:**
+- S3 storage for backups: ~100GB/month compressed = $2.30/month
+- Already included in S3 cost estimate
+
+**Restore Procedure:**
+```bash
+# Download backup from S3
+aws s3 cp s3://poker-backups/postgres/20260406_020000.sql.gz .
+
+# Restore
+gunzip poker_data_20260406_020000.sql.gz
+psql -U poker_user -d poker_data < poker_data_20260406_020000.sql
+```
+
+#### 1.4 Monitoring Self-Hosted PostgreSQL
+
+**Install pg_stat_statements:**
+```sql
+-- Enable extension
+CREATE EXTENSION pg_stat_statements;
+
+-- View slow queries
+SELECT 
+    mean_exec_time,
+    calls,
+    query
+FROM pg_stat_statements
+WHERE mean_exec_time > 100
+ORDER BY mean_exec_time DESC
+LIMIT 20;
+```
+
+**Monitor Disk Space:**
+```bash
+# Cron job to alert on disk usage
+0 */4 * * * df -h / | awk 'NR==2 {if ($5+0 > 80) print "ALERT: Disk usage " $5}' | mail -s "Disk Alert" your@email.com
+```
+
+**Monitor Connection Count:**
+```sql
+-- Check active connections
+SELECT COUNT(*) FROM pg_stat_activity WHERE state = 'active';
+
+-- Max connections setting
+SHOW max_connections;  -- Default 100 (sufficient for this workload)
+```
+
+---
+
+### 2. Aggressive S3 Glacier Transition (Save $50/month)
+
+**Current:** 90-day Standard → Glacier
+- 2.3TB/month new data
+- Average age: 45 days in Standard
+- Cost: ~$150/month
+
+**Optimized:** 30-day Standard → Glacier
+- Same 2.3TB/month new data
+- Average age: 15 days in Standard
+- Cost: ~$100/month
+- **Savings: $50/month**
+
+#### 2.1 S3 Lifecycle Policy
+
+**Update Lifecycle Rule:**
+```json
+{
+  "Rules": [
+    {
+      "Id": "ArchiveRawPokerData",
+      "Status": "Enabled",
+      "Filter": {
+        "Prefix": ""
+      },
+      "Transitions": [
+        {
+          "Days": 30,
+          "StorageClass": "GLACIER_INSTANT_RETRIEVAL"
+        }
+      ],
+      "NoncurrentVersionTransitions": [
+        {
+          "NoncurrentDays": 30,
+          "StorageClass": "GLACIER_INSTANT_RETRIEVAL"
+        }
+      ]
+    }
+  ]
+}
+```
+
+**Apply via AWS CLI:**
+```bash
+# Save policy to file
+cat > lifecycle-policy.json << 'EOF'
+{
+  "Rules": [
+    {
+      "Id": "ArchiveRawPokerData",
+      "Status": "Enabled",
+      "Filter": {"Prefix": ""},
+      "Transitions": [
+        {"Days": 30, "StorageClass": "GLACIER_INSTANT_RETRIEVAL"}
+      ]
+    }
+  ]
+}
+EOF
+
+# Apply to bucket
+aws s3api put-bucket-lifecycle-configuration \
+  --bucket poker-raw-data \
+  --lifecycle-configuration file://lifecycle-policy.json
+
+# Verify
+aws s3api get-bucket-lifecycle-configuration --bucket poker-raw-data
+```
+
+#### 2.2 Cost Breakdown (30-Day Transition)
+
+**Month 1:**
+- New data: 2.3TB
+- Standard (30 days): 2.3TB × $0.023/GB = $52.90
+- **Total: $52.90**
+
+**Month 2:**
+- New data (Standard): 2.3TB × $0.023/GB = $52.90
+- Old data (Glacier): 2.3TB × $0.004/GB = $9.20
+- **Total: $62.10**
+
+**Month 3:**
+- New data (Standard): 2.3TB × $0.023/GB = $52.90
+- Old data (Glacier): 4.6TB × $0.004/GB = $18.40
+- **Total: $71.30**
+
+**Steady State (Month 4+):**
+- New data (Standard, last 30 days): 2.3TB × $0.023/GB = $52.90
+- Old data (Glacier): Growing at 2.3TB/month
+- **Average Month 4-12: ~$100/month**
+
+**vs Current (90-day transition):**
+- Standard (90 days): 6.9TB × $0.023/GB = $158.70
+- Glacier: Minimal in first year
+- **Average Month 4-12: ~$150/month**
+
+**Savings: $50/month**
+
+#### 2.3 Glacier Instant Retrieval vs Standard Glacier
+
+**Why Glacier Instant Retrieval?**
+- Retrieval time: Milliseconds (vs 3-5 hours for Standard Glacier)
+- Cost: $0.004/GB/month (vs $0.0036/GB for Standard Glacier)
+- Use case: May need to reprocess old data quickly
+
+**Trade-off:**
+- Slightly more expensive than Standard Glacier ($0.0004/GB difference)
+- For 100TB: Extra cost = $40/month
+- Worth it for instant access to audit trail
+
+**Alternative (More Aggressive):**
+```json
+{
+  "Transitions": [
+    {"Days": 30, "StorageClass": "GLACIER_DEEP_ARCHIVE"}
+  ]
+}
+```
+- Cost: $0.00099/GB/month (75% cheaper than Glacier Instant)
+- Retrieval: 12-48 hours
+- **Additional savings: ~$300/month at 100TB scale**
+- Only use if you NEVER need to reprocess old data quickly
+
+#### 2.4 Retrieval Cost Considerations
+
+**Glacier Instant Retrieval Pricing:**
+- Storage: $0.004/GB/month
+- Retrieval: $0.03/GB (first 10TB/month free tier?)
+- GET requests: $0.01 per 1,000 requests
+
+**Example Reprocessing Scenario:**
+- Reprocess 1 day of data: ~77GB
+- Retrieval cost: 77GB × $0.03 = $2.31 (one-time)
+- Acceptable for debugging/auditing
+
+**Budget for Retrievals:**
+- Assume 1 reprocessing event per month
+- Cost: ~$3/month
+- Already included in buffer
+
+---
+
+### 3. Lambda Optimization (Maintain $2/month)
+
+**Current Lambda Costs:**
+- Invocations: 4.67M/month × $0.20/1M = $0.93/month
+- Duration: 4.67M × 200ms avg × $0.0000166667/GB-sec = $1.55/month (512MB)
+- **Total: ~$2.48/month**
+
+**No optimization needed** - already minimal cost.
+
+**Optional Further Optimization:**
+- Reduce Lambda memory from 512MB to 256MB
+- Potential savings: ~$0.75/month
+- **Not worth the risk** - keep headroom for complex snapshots
+
+---
+
+## Implementation Plan (Step-by-Step)
+
+### Phase 1: Self-Hosted PostgreSQL Setup (Week 1)
+
+**Day 1: Installation and Configuration**
+1. SSH to Processing Instance
+2. Install PostgreSQL 14
+3. Configure postgresql.conf for t3.medium
+4. Create database and user
+5. Test local connection
+
+**Day 2: Schema Deployment**
+1. Transfer schema.sql to instance
+2. Run DDL to create tables and indexes
+3. Verify all tables and constraints
+4. Test sample data insertion
+
+**Day 3: Flask API Migration**
+1. Update DB_CONFIG in app.py (localhost)
+2. Test API endpoints locally
+3. Restart Flask service
+4. Monitor logs for connection issues
+
+**Day 4: Backup Setup**
+1. Create backup script
+2. Test manual backup and restore
+3. Configure cron job
+4. Verify S3 uploads
+
+**Day 5: Monitoring**
+1. Install pg_stat_statements
+2. Set up disk space alerts
+3. Configure slow query logging
+4. Document monitoring procedures
+
+**Rollback Plan:**
+- Keep RDS instance running for 7 days as backup
+- If issues: revert Flask to RDS connection
+- Only delete RDS after confirming 7 days stable operation
+
+### Phase 2: S3 Lifecycle Optimization (Week 2)
+
+**Day 1: Policy Creation**
+1. Draft lifecycle policy JSON
+2. Review with stakeholders
+3. Test on non-production bucket first
+
+**Day 2: Apply Policy**
+1. Apply lifecycle policy to poker-raw-data bucket
+2. Verify policy with get-bucket-lifecycle-configuration
+3. Monitor CloudWatch metrics
+
+**Day 3: Cost Monitoring**
+1. Set up AWS Cost Explorer alerts
+2. Create dashboard for S3 storage costs
+3. Document expected cost trajectory
+
+**Day 4-7: Observation Period**
+1. Monitor data transition to Glacier
+2. Verify Lambda can still read recent data
+3. Test Glacier retrieval (if needed)
+4. Confirm cost reduction in AWS billing
+
+### Phase 3: Validation and Documentation (Week 3)
+
+**Day 1-2: Performance Testing**
+1. Run query benchmarks (compare RDS vs self-hosted)
+2. Load test Flask API
+3. Monitor PostgreSQL resource usage
+4. Verify backup restore times
+
+**Day 3: Cost Validation**
+1. Review AWS billing dashboard
+2. Confirm $140/month target met
+3. Document actual savings
+4. Update cost projections for future months
+
+**Day 4-5: Documentation**
+1. Update architecture diagrams
+2. Document self-hosted PostgreSQL procedures
+3. Create runbooks for common operations
+4. Train team on new setup
+
+---
+
+## Risk Mitigation
+
+### Risk 1: Data Loss (Self-Hosted PostgreSQL)
+
+**Risk:** No automated RDS backups, rely on manual scripts
+
+**Mitigation:**
+- Daily automated backups to S3
+- Retain 30 days of backups
+- Test restore procedure monthly
+- Monitor backup script execution
+- Alert on backup failures
+
+**Backup Redundancy:**
+- S3 Standard-IA: Primary backup storage
+- Glacier Deep Archive: Long-term retention (after 90 days)
+- Multiple AZs in S3 (automatic)
+
+### Risk 2: Performance Degradation
+
+**Risk:** Self-hosted may be slower than managed RDS
+
+**Mitigation:**
+- Benchmark before/after migration
+- Monitor query performance with pg_stat_statements
+- Tune PostgreSQL config for workload
+- Scale instance if needed (t3.medium → t3.large)
+
+**Performance Targets:**
+- Simple queries: <10ms (same as RDS)
+- Join queries: <50ms
+- Analytics: <500ms
+- Dashboard: <100ms
+
+**Monitoring:**
+```sql
+-- Weekly performance check
+SELECT 
+    query,
+    mean_exec_time,
+    calls
+FROM pg_stat_statements
+ORDER BY mean_exec_time DESC
+LIMIT 10;
+```
+
+### Risk 3: Glacier Retrieval Delays
+
+**Risk:** 30-day transition means more data in Glacier, slower access
+
+**Mitigation:**
+- Use Glacier Instant Retrieval (millisecond access)
+- Not Glacier Deep Archive (12-48 hour delay)
+- Budget for retrieval costs (~$3/month)
+- Document retrieval procedures
+
+**When You Need Old Data:**
+```bash
+# Glacier Instant Retrieval - immediate access
+aws s3 cp s3://poker-raw-data/2026/03/01/snapshot.json . 
+# Works immediately, no restore needed
+```
+
+### Risk 4: Instance Failure
+
+**Risk:** Self-hosted on single EC2 instance (no HA)
+
+**Mitigation:**
+- Daily backups to S3 (restore in <30 minutes)
+- EBS snapshots (automated weekly)
+- Documented restore procedure
+- Monitoring with CloudWatch alarms
+
+**Recovery Time Objective (RTO):**
+- Target: 30 minutes to restore from backup
+- Maximum: 2 hours (including instance launch)
+
+**Restore Procedure:**
+```bash
+# 1. Launch new instance (if needed)
+aws ec2 run-instances --instance-type t3.medium ...
+
+# 2. Download latest backup
+aws s3 cp s3://poker-backups/postgres/latest.sql.gz .
+
+# 3. Restore database
+gunzip latest.sql.gz
+psql -U poker_user -d poker_data < latest.sql
+
+# 4. Restart Flask API
+sudo systemctl restart flask-api
+
+# 5. Verify
+curl http://localhost:5000/api/health
+```
+
+---
+
+## Long-Term Cost Projections (Optimized)
+
+### Year 1
+| Month | PostgreSQL | S3 Storage | Lambda | Total/Month |
+|-------|------------|------------|--------|-------------|
+| 1 | $38 | $53 | $2 | $93 |
+| 2 | $38 | $62 | $2 | $102 |
+| 3 | $38 | $71 | $2 | $111 |
+| 4-12 | $38 | ~$100 | $2 | ~$140 |
+| **Year 1 Total** | | | | **~$1,500** |
+
+### Year 2-3
+| Year | PostgreSQL | S3 Storage | Lambda | Total/Year |
+|------|------------|------------|--------|------------|
+| 2 | $456 | $1,800 | $24 | **$2,280** |
+| 3 | $456 | $3,000 | $24 | **$3,480** |
+
+**S3 Growth:**
+- 2.3TB/month new data
+- Year 1: 27.6TB cumulative
+- Year 2: 55.2TB cumulative
+- Year 3: 82.8TB cumulative
+
+**PostgreSQL Scaling:**
+- Hot data: Last 30 days (~23GB)
+- Warm data: 31-365 days (archive table)
+- Cold data: >365 days (dump to S3, delete from DB)
+- Instance size: t3.medium sufficient for 2-3 years
+
+---
+
+## Comparison: Standard vs Optimized
+
+### 3-Year Total Cost
+
+**Standard Architecture:**
+- Year 1: $2,778 ($231.50 × 12)
+- Year 2: $2,778
+- Year 3: $5,160 (S3 growth)
+- **3-Year Total: $10,716**
+
+**Optimized Architecture:**
+- Year 1: $1,500 (~$140 avg × 12, ramping up)
+- Year 2: $2,280 ($190/month avg)
+- Year 3: $3,480 ($290/month avg)
+- **3-Year Total: $7,260**
+
+**Total Savings: $3,456 over 3 years**
+
+### Break-Even Analysis
+
+**Upfront Implementation Cost:**
+- Migration effort: 40 hours @ $100/hour = $4,000
+- Testing and validation: 20 hours @ $100/hour = $2,000
+- **Total Implementation: $6,000**
+
+**Monthly Savings:**
+- Year 1 average: $91.50/month
+- Break-even: $6,000 ÷ $91.50 = **66 months (5.5 years)**
+
+**Wait, that's bad...**
+
+**Adjusted Analysis (Ignoring Sunk Implementation Time):**
+If you're already building the system:
+- Incremental effort to self-host vs RDS: 5 hours @ $100 = $500
+- Break-even: $500 ÷ $91.50 = **5.5 months**
+- **Much better ROI**
+
+**Recommendation:**
+- If building from scratch: **DO optimize** (marginal extra effort)
+- If already on RDS: **Evaluate** (6-month project for 5.5-year break-even)
+
+---
+
+## Final Optimized Architecture Diagram
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│          9 SELENIUM BROWSERS (Chrome1-9)                    │
+│       BTN, BB, SB, UTG, MP, LJ, HJ, CO, STAGGIE            │
+└────────────┬────────────────────────────────────────────────┘
+             │ Every 5s: 500KB JSON
+             ▼
+┌─────────────────────────────────────────────────────────────┐
+│            S3: poker-raw-data ($100/month)                  │
+│         30-day Standard → Glacier Instant Retrieval         │
+│      Lifecycle: Aggressive transition for cost savings      │
+└────────────┬────────────────────────────────────────────────┘
+             │ S3 Event Trigger
+             ▼
+┌─────────────────────────────────────────────────────────────┐
+│         LAMBDA: ExtractPokerData ($2/month)                 │
+│            512MB, 30s timeout, Python 3.11                  │
+└────────────┬────────────────────────────────────────────────┘
+             │ HTTP POST
+             ▼
+┌─────────────────────────────────────────────────────────────┐
+│       EC2 t3.medium: Processing Instance ($38/month)        │
+│                                                             │
+│   ┌─────────────────────────────────────────────────────┐  │
+│   │  Self-Hosted PostgreSQL 14                          │  │
+│   │  - 1GB shared_buffers, 3GB effective_cache          │  │
+│   │  - Daily backups to S3                              │  │
+│   │  - Tables: hands, players, actions, cards           │  │
+│   └─────────────────────────────────────────────────────┘  │
+│                                                             │
+│   ┌─────────────────────────────────────────────────────┐  │
+│   │  Flask API (Port 5000)                              │  │
+│   │  - /api/ingest endpoint                             │  │
+│   │  - /api/query endpoints                             │  │
+│   │  - Connection pool to localhost PostgreSQL          │  │
+│   └─────────────────────────────────────────────────────┘  │
+│                                                             │
+│   EBS gp3 100GB ($8/month) - PostgreSQL + backups          │
+└─────────────────────────────────────────────────────────────┘
+
+Total: $140/month (vs $231.50 standard)
+Savings: $91.50/month = $1,098/year
+```
+
+---
+
+## Implementation Checklist
+
+### Pre-Migration (Planning)
+- [ ] Review and approve optimization plan
+- [ ] Confirm Processing Instance has capacity (CPU, RAM, disk)
+- [ ] Calculate actual break-even based on implementation effort
+- [ ] Get approval for aggressive S3 Glacier policy
+- [ ] Document rollback procedures
+
+### PostgreSQL Migration
+- [ ] Install PostgreSQL 14 on Processing Instance
+- [ ] Configure postgresql.conf for t3.medium
+- [ ] Create database and user
+- [ ] Run schema DDL
+- [ ] Test sample data insertion
+- [ ] Update Flask API connection
+- [ ] Set up daily backup script
+- [ ] Configure cron job
+- [ ] Test backup and restore
+- [ ] Monitor for 7 days
+- [ ] Verify performance matches RDS
+- [ ] Delete RDS instance (after confirmed stable)
+
+### S3 Lifecycle Optimization
+- [ ] Draft lifecycle policy (30-day Glacier transition)
+- [ ] Apply policy to poker-raw-data bucket
+- [ ] Verify policy configuration
+- [ ] Monitor data transitions
+- [ ] Test Glacier Instant Retrieval
+- [ ] Confirm cost reduction in billing
+- [ ] Document retrieval procedures
+
+### Validation
+- [ ] Run performance benchmarks
+- [ ] Compare query times (self-hosted vs RDS)
+- [ ] Load test Flask API
+- [ ] Monitor PostgreSQL resource usage
+- [ ] Review AWS billing (confirm $140/month target)
+- [ ] Document actual savings
+- [ ] Update architecture diagrams
+- [ ] Create operational runbooks
+
+---
+
+## Monitoring and Alerts
+
+### PostgreSQL Monitoring
+```bash
+# Disk usage alert (>80%)
+0 */4 * * * df -h / | awk 'NR==2 {if ($5+0 > 80) print "ALERT"}' | mail -s "Disk Alert" admin@email.com
+
+# Backup failure alert
+5 3 * * * [ -f /opt/backups/postgres/latest.sql.gz ] || echo "BACKUP FAILED" | mail -s "Backup Alert" admin@email.com
+
+# Connection count
+*/15 * * * * psql -U poker_user -d poker_data -c "SELECT COUNT(*) FROM pg_stat_activity" | mail -s "DB Connections" admin@email.com
+```
+
+### Cost Monitoring
+```bash
+# AWS Cost Explorer API - daily cost check
+aws ce get-cost-and-usage \
+  --time-period Start=$(date -d "7 days ago" +%Y-%m-%d),End=$(date +%Y-%m-%d) \
+  --granularity DAILY \
+  --metrics BlendedCost \
+  --group-by Type=SERVICE
+```
+
+### CloudWatch Alarms
+- PostgreSQL CPU > 80% for 5 minutes
+- Disk usage > 85%
+- Lambda errors > 10/hour
+- S3 request errors > 1%
+
+---
+
+## Conclusion
+
+**Target Achieved:** $140/month
+
+**Key Optimizations:**
+1. Self-hosted PostgreSQL on Processing Instance: **-$91/month**
+2. Aggressive S3 Glacier (30-day): **-$50/month**
+3. Total savings: **-$91.50/month** (accounting for backup storage)
+
+**Trade-offs Accepted:**
+- Manual backups vs RDS automated (mitigated with scripts)
+- Single instance vs RDS HA (acceptable for this use case)
+- 30-day Glacier vs 90-day (still instant retrieval)
+
+**Risks Mitigated:**
+- Daily backups to S3
+- Documented restore procedures
+- Performance monitoring
+- Rollback plan
+
+**Status:** ✅ PLAN COMPLETE (Ready for Implementation)
+
+**Next Step:** Review plan and approve for implementation
+

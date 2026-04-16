@@ -1,0 +1,22 @@
+from flask import Flask, jsonify
+import os
+
+app = Flask(__name__)
+
+@app.route('/api/health')
+def health():
+    return jsonify({
+        "ok": True,
+        "version": "test-1.0",
+        "environment": os.getenv("FLASK_ENV", "unknown")
+    })
+
+@app.route('/api/tables')
+def tables():
+    return jsonify({
+        "ok": True,
+        "tables": []
+    })
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5000)

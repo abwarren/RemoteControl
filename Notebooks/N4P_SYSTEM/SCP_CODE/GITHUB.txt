@@ -1,0 +1,14 @@
+Content-Type: text/x-zim-wiki
+Wiki-Format: zim 0.6
+Creation-Date: 2026-04-01T09:34:39+02:00
+
+====== GITHUB ======
+Created Wednesday 01 April 2026
+
+cd ~/potlimitomaha-backup/plo-equity
+git push -u origin main
+
+Username: abwarren
+Password: [REDACTED — use SSH key or gh auth instead]
+
+git remote set-url origin git@github.com:abwarren/ploequity.git

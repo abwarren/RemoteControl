@@ -1,0 +1,320 @@
+Content-Type: text/x-zim-wiki
+Wiki-Format: zim 0.6
+Creation-Date: 2026-04-04T16:59:17+02:00
+
+====== NAVIGATION ======
+Created Saturday 04 undefinedApril 2026
+
+Time)
+document.addEventListener('click', function(e) {
+	console.log(e.target);
+	console.log(e.target.tagName + " " + e.target.className);
+});
+undefined
+VM2814:2 <span>​Sign in​</span>​
+VM2814:3 SPAN 
+detector.js:1 Error occurred in ProKeys. Mail a screen shot to prokeys.feedback@gmail.com to help me fix it! Thanks!
+detector.js:1 Uncaught TypeError: Cannot read properties of undefined (reading 'toLowerCase') ErrorEvent {isTrusted: true, message: "Uncaught TypeError: Cannot read properties of undefined (reading 'toLowerCase')", filename: 'chrome-extension://ekfnbpgmmeahnnlpjibofkobpdkifapn/js/detector.js', lineno: 1, colno: 41329, …}
+(anonymous) @ detector.js:1Understand this error
+detector.js:1 console.trace
+(anonymous) @ detector.js:1
+detector.js:1 Uncaught TypeError: Cannot read properties of undefined (reading 'toLowerCase')
+	at detector.js:1:41329
+	at HTMLInputElement.t (detector.js:1:41373)
+	at HTMLDocument.<anonymous> (detector.js:1:40026)
+(anonymous) @ detector.js:1
+t @ detector.js:1
+(anonymous) @ detector.js:1Understand this error
+VM2814:2 <input type=​"text" class=​"form-control-input-bc" name=​"username" step=​"0" value=​"Kele1" data-prokeyscachednode=​"true" data-gtm-form-interact-field-id=​"0">​
+VM2814:3 INPUT form-control-input-bc
+VM2814:2 <input type=​"password" class=​"form-control-input-bc" autocomplete=​"current-password" name=​"password" step=​"0" value=​"PokerPass123" data-prokeyscachednode=​"false" data-gtm-form-interact-field-id=​"1">​
+VM2814:3 INPUT form-control-input-bc
+VM2814:2 <div class=​"popup-middleware-bc">​…​</div>​flex
+VM2814:3 DIV popup-middleware-bc
+VM2814:2 <i class=​"checkbox-control-icon-bc bc-i-checked">​…​</i>​
+VM2814:3 I checkbox-control-icon-bc bc-i-checked
+VM2814:2 <input type=​"checkbox" class=​"checkbox-control-input-bc" name=​"remember_me" step=​"0" data-gtm-form-interact-field-id=​"2">​
+VM2814:3 INPUT checkbox-control-input-bc
+VM2814:2 <button class=​"btn a-color " type=​"submit" title=​"Sign in">​…​</button>​
+VM2814:3 BUTTON btn a-color 
+VM2814:2 <i class=​"form-control-icon-bc bc-i-eye">​…​</i>​flex
+VM2814:3 I form-control-icon-bc bc-i-eye
+VM2814:2 <input type=​"text" class=​"form-control-input-bc" autocomplete=​"current-password" name=​"password" step=​"0" value=​"PokerPass123" data-prokeyscachednode=​"false" data-gtm-form-interact-field-id=​"1">​
+VM2814:3 INPUT form-control-input-bc
+VM2814:2 <input type=​"text" class=​"form-control-input-bc" name=​"username" step=​"0" value=​"Kele" data-prokeyscachednode=​"true" data-gtm-form-interact-field-id=​"0">​
+VM2814:3 INPUT form-control-input-bc
+VM2814:2 <button class=​"btn a-color " type=​"submit" title=​"Sign in">​…​</button>​
+VM2814:3 BUTTON btn a-color 
+VM2814:2 <span>​Play​</span>​
+VM2814:3 SPAN 
+
+
+===== = =====
+
+document.addEventListener('click', function(e) {
+	console.log(e.target);
+	console.log(e.target.tagName + " " + e.target.className);
+});
+undefined
+main.26042fdf1e1d5bea.js:1 <span _ngcontent-ng-c1486871974>​Cash Games​</span>​
+main.26042fdf1e1d5bea.js:1 SPAN 
+main.26042fdf1e1d5bea.js:1 <a _ngcontent-ng-c2639206113 class=​"filter-middle-text">​ Omaha 4 ​</a>​flex
+main.26042fdf1e1d5bea.js:1 A filter-middle-text
+main.26042fdf1e1d5bea.js:1 NotAllowedError, Failed to execute 'request' on 'WakeLock': Access to Screen Wake Lock features is disallowed by permissions policy
+(anonymous) @ main.26042fdf1e1d5bea.js:1
+(anonymous) @ main.26042fdf1e1d5bea.js:1
+$.invoke @ polyfills.973a3de378a55116.js:1
+$.run @ polyfills.973a3de378a55116.js:1
+(anonymous) @ polyfills.973a3de378a55116.js:1
+$.invokeTask @ polyfills.973a3de378a55116.js:1
+$.runTask @ polyfills.973a3de378a55116.js:1
+J @ polyfills.973a3de378a55116.js:1
+Promise.then
+Ct @ polyfills.973a3de378a55116.js:1
+ht @ polyfills.973a3de378a55116.js:1
+$.scheduleTask @ polyfills.973a3de378a55116.js:1
+$.scheduleTask @ polyfills.973a3de378a55116.js:1
+$.scheduleMicroTask @ polyfills.973a3de378a55116.js:1
+Wt @ polyfills.973a3de378a55116.js:1
+Dt @ polyfills.973a3de378a55116.js:1
+(anonymous) @ polyfills.973a3de378a55116.js:1
+(anonymous) @ polyfills.973a3de378a55116.js:1
+Promise.then
+(anonymous) @ polyfills.973a3de378a55116.js:1
+R @ polyfills.973a3de378a55116.js:1
+R.then @ polyfills.973a3de378a55116.js:1
+enable @ main.26042fdf1e1d5bea.js:1
+(anonymous) @ main.26042fdf1e1d5bea.js:1
+l @ main.26042fdf1e1d5bea.js:1
+_ @ main.26042fdf1e1d5bea.js:1
+(anonymous) @ main.26042fdf1e1d5bea.js:1
+R @ polyfills.973a3de378a55116.js:1
+(anonymous) @ main.26042fdf1e1d5bea.js:1
+enable @ main.26042fdf1e1d5bea.js:1
+(anonymous) @ main.26042fdf1e1d5bea.js:1
+rt.<computed> @ polyfills.973a3de378a55116.js:1
+$.invokeTask @ polyfills.973a3de378a55116.js:1
+$.runTask @ polyfills.973a3de378a55116.js:1
+$.invokeTask @ polyfills.973a3de378a55116.js:1
+invoke @ polyfills.973a3de378a55116.js:1
+W._.args.<computed> @ polyfills.973a3de378a55116.js:1
+setInterval
+W @ polyfills.973a3de378a55116.js:1
+$.scheduleTask @ polyfills.973a3de378a55116.js:1
+$.scheduleTask @ polyfills.973a3de378a55116.js:1
+$.scheduleMacroTask @ polyfills.973a3de378a55116.js:1
+H @ polyfills.973a3de378a55116.js:1
+(anonymous) @ polyfills.973a3de378a55116.js:1
+Jt.m.<computed> @ polyfills.973a3de378a55116.js:1
+(anonymous) @ main.26042fdf1e1d5bea.js:1
+$.invoke @ polyfills.973a3de378a55116.js:1
+$.run @ polyfills.973a3de378a55116.js:1
+runOutsideAngular @ main.26042fdf1e1d5bea.js:1
+startActivity @ main.26042fdf1e1d5bea.js:1
+eventHandler @ main.26042fdf1e1d5bea.js:1
+$.invokeTask @ polyfills.973a3de378a55116.js:1
+onInvokeTask @ main.26042fdf1e1d5bea.js:1
+$.invokeTask @ polyfills.973a3de378a55116.js:1
+$.runTask @ polyfills.973a3de378a55116.js:1
+$.invokeTask @ polyfills.973a3de378a55116.js:1
+ot @ polyfills.973a3de378a55116.js:1
+lt @ polyfills.973a3de378a55116.js:1
+Ot @ polyfills.973a3de378a55116.js:1Understand this error
+main.26042fdf1e1d5bea.js:1 no sleep service enable NotAllowedError: Failed to execute 'request' on 'WakeLock': Access to Screen Wake Lock features is disallowed by permissions policy
+	at v.enable (main.26042fdf1e1d5bea.js:1:1547647)
+	at main.26042fdf1e1d5bea.js:1:315858
+	at Generator.next (<anonymous>)
+	at l (main.26042fdf1e1d5bea.js:1:2004808)
+	at _ (main.26042fdf1e1d5bea.js:1:2005010)
+	at main.26042fdf1e1d5bea.js:1:2005069
+	at new R (polyfills.973a3de378a55116.js:1:19469)
+	at main.26042fdf1e1d5bea.js:1:2004951
+	at i.enable (main.26042fdf1e1d5bea.js:1:315946)
+	at main.26042fdf1e1d5bea.js:1:315511
+	at rt.<computed> (polyfills.973a3de378a55116.js:1:32238)
+	at $.invokeTask (polyfills.973a3de378a55116.js:1:8852)
+	at $.runTask (polyfills.973a3de378a55116.js:1:3838)
+	at $.invokeTask (polyfills.973a3de378a55116.js:1:9992)
+	at invoke (polyfills.973a3de378a55116.js:1:9882)
+	at W._.args.<computed> (polyfills.973a3de378a55116.js:1:31927)
+main.26042fdf1e1d5bea.js:1 <li _ngcontent-ng-c4199328582>​…​</li>​
+main.26042fdf1e1d5bea.js:1 LI 
+main.26042fdf1e1d5bea.js:1 <button _ngcontent-ng-c517401826 class=​"button-p-view light">​ Join ​</button>​
+main.26042fdf1e1d5bea.js:1 BUTTON button-p-view light
+main.26042fdf1e1d5bea.js:1 <button _ngcontent-ng-c3704728322 class=​"button-view-m-p">​ Join ​</button>​
+main.26042fdf1e1d5bea.js:1 BUTTON button-view-m-p
+main.26042fdf1e1d5bea.js:1 <button _ngcontent-ng-c1564657196>​Min​</button>​
+main.26042fdf1e1d5bea.js:1 BUTTON 
+main.26042fdf1e1d5bea.js:1 <button _ngcontent-ng-c1564657196>​Max​</button>​
+main.26042fdf1e1d5bea.js:1 BUTTON 
+main.26042fdf1e1d5bea.js:1 <span _ngcontent-ng-c1564657196>​…​</span>​
+main.26042fdf1e1d5bea.js:1 SPAN 
+main.26042fdf1e1d5bea.js:1 <input _ngcontent-ng-c1564657196 type=​"checkbox" class=​"ng-untouched ng-valid ng-dirty">​
+main.26042fdf1e1d5bea.js:1 INPUT ng-untouched ng-pristine ng-valid
+main.26042fdf1e1d5bea.js:1 <button _ngcontent-ng-c1564657196 class=​"button-view-m-p disabled">​ Buy-In ​</button>​
+main.26042fdf1e1d5bea.js:1 BUTTON button-view-m-p disabled
+
+
+===== = =====
+
+sg-modal > div > div > div > div > sg-buy-in-modal > div > div > div.modal-button-container > ul > li:nth-child(1) > button
+
+
+(() => {
+  const TABLE_SEL = "sg-poker-table";
+  const HERO_SEAT_SEL = "sg-poker-table-seat.player-1";
+  const HERO_NAME_SEL = ".self-player";
+  const BOARD_SEL = "sg-poker-board";
+
+  const table = document.querySelector(TABLE_SEL);
+  const heroSeat = document.querySelector(HERO_SEAT_SEL);
+  const boardRoot = document.querySelector(BOARD_SEL);
+
+  if (!table) {
+	console.error("❌ Table root not found:", TABLE_SEL);
+	return;
+  }
+  if (!heroSeat) {
+	console.error("❌ Hero seat not found:", HERO_SEAT_SEL);
+	return;
+  }
+  if (!boardRoot) {
+	console.error("❌ Board root not found:", BOARD_SEL);
+	return;
+  }
+
+  const CARD_NODE_SELECTORS = [
+	'[class*="card"]',
+	'[class*="Card"]',
+	'[class*="rank"]',
+	'[class*="suit"]',
+	'[class*="hole"]',
+	'[class*="board"]',
+	'[class*="icon-layer2"]',
+	'svg',
+	'img'
+  ].join(",");
+
+  function uniq(arr) {
+	return [...new Set(arr.filter(Boolean))];
+  }
+
+  function clean(s) {
+	return (s || "").replace(/\s+/g, " ").trim();
+  }
+
+  function nodeFingerprint(el) {
+	if (!el) return "";
+	const tag = el.tagName?.toLowerCase() || "";
+	const cls = clean(el.className || "");
+	const txt = clean(el.textContent || "");
+	return `${tag}|${cls}|${txt}`;
+  }
+
+  function pickLikelyCardNodes(root, scopeName) {
+	const all = [...root.querySelectorAll(CARD_NODE_SELECTORS)];
+
+	const filtered = all.filter(el => {
+	  const cls = clean(el.className || "").toLowerCase();
+	  const txt = clean(el.textContent || "");
+	  const html = (el.outerHTML || "").toLowerCase();
+
+	  return (
+		/card|rank|suit|hole|board|icon-layer2/.test(cls) ||
+		/card|rank|suit|hole|board/.test(html) ||
+		/^[2-9TJQKA][shdc]$/i.test(txt) ||
+		/^[2-9TJQKA]$/.test(txt) ||
+		/spade|heart|diamond|club/.test(cls)
+	  );
+	});
+
+	const deduped = [];
+	const seen = new Set();
+
+	for (const el of filtered) {
+	  const fp = nodeFingerprint(el);
+	  if (!seen.has(fp)) {
+		seen.add(fp);
+		deduped.push(el);
+	  }
+	}
+
+	console.log(`📌 ${scopeName} candidate card nodes:`, deduped);
+	return deduped;
+  }
+
+  function extractCardToken(el) {
+	const txt = clean(el.textContent || "");
+	const cls = clean(el.className || "");
+	const html = (el.outerHTML || "");
+
+	let rank = null;
+	let suit = null;
+
+	// 1) Direct text like "As"
+	const direct = txt.match(/\b([2-9TJQKA])\s*([shdc])\b/i);
+	if (direct) return (direct[1] + direct[2].toLowerCase());
+
+	// 2) Rank from text
+	const rankTxt = txt.match(/\b([2-9TJQKA])\b/i);
+	if (rankTxt) rank = rankTxt[1].toUpperCase();
+
+	// 3) Rank from class/html
+	if (!rank) {
+	  const rankCls = (cls + " " + html).match(/(?:rank[-_: ]?)(10|[2-9]|[TJQKA])/i);
+	  if (rankCls) {
+		rank = rankCls[1].toUpperCase();
+		if (rank === "10") rank = "T";
+	  }
+	}
+
+	// 4) Suit from class/html/text
+	const suitSource = (cls + " " + html + " " + txt).toLowerCase();
+	if (/spade|spades|\b_s\b|\bs\b/.test(suitSource)) suit = "s";
+	else if (/heart|hearts|\b_h\b|\bh\b/.test(suitSource)) suit = "h";
+	else if (/diamond|diamonds|\b_d\b|\bd\b/.test(suitSource)) suit = "d";
+	else if (/club|clubs|\b_c\b|\bc\b/.test(suitSource)) suit = "c";
+
+	if (rank && suit) return rank + suit;
+	return null;
+  }
+
+  function collapseCards(nodes, expectedMax = 10) {
+	const tokens = nodes.map(extractCardToken).filter(Boolean);
+
+	// keep order as rendered, remove duplicates
+	const ordered = uniq(tokens).slice(0, expectedMax);
+	return ordered;
+  }
+
+  // HERO AREA
+  const heroArea = heroSeat;
+  const heroNodes = pickLikelyCardNodes(heroArea, "HERO");
+  const heroCards = collapseCards(heroNodes, 2);
+
+  // BOARD AREA
+  const boardArea = boardRoot;
+  const boardNodes = pickLikelyCardNodes(boardArea, "BOARD");
+  const boardCards = collapseCards(boardNodes, 5);
+
+  const result = {
+	heroSeatSelector: HERO_SEAT_SEL,
+	boardSelector: BOARD_SEL,
+	heroCards,
+	boardCards,
+	raw: {
+	  heroNodeCount: heroNodes.length,
+	  boardNodeCount: boardNodes.length
+	}
+  };
+
+  console.log("✅ EXTRACTION RESULT");
+  console.log(result);
+
+  // pretty output
+  console.log("Hero:", heroCards.join(" "));
+  console.log("Board:", boardCards.join(" "));
+
+  // expose for reuse
+  window.__pokerExtract = result;
+})();

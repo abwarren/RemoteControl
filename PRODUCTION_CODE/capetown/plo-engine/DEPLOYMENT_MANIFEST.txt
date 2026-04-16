@@ -1,0 +1,34 @@
+PLO ENGINE DEPLOYMENT MANIFEST
+================================
+Date: 2026-04-09 01:54:40 UTC
+Source: plo@nuts4poker.com:/opt/plo-equity/static/
+Destination: /opt/plo-engine/static/
+Method: Pure copy, zero modifications
+
+FILES DEPLOYED:
+- index.html (699 bytes, MD5: 7ba5cd9d8ce9a822ef2cf4948a7acc7c)
+- n4p.js (1791 bytes, MD5: 0cd152749f234757ebd08cbf4a01a862)
+- assets/index-CJ8OVtHP.js (284716 bytes, MD5: 59f17ce821199351873e220360ea7d31)
+- assets/index-DgTzSuxS.css (14866 bytes, MD5: 927efe65d99c14612669dbf09ebf99e4)
+
+NGINX CONFIGURATION:
+- Config: /etc/nginx/sites-available/default
+- Enabled: /etc/nginx/sites-enabled/default (symlink)
+- URL Path: /engine/
+- Assets Path: /assets/
+- Backup: /etc/nginx/sites-available/default.deployed.20260409_035440
+
+ACCESS URLS:
+- http://15.240.70.199/engine/
+- http://ec2-15-240-70-199.af-south-1.compute.amazonaws.com/engine/
+- https://15.240.70.199/engine/ (self-signed cert)
+
+VERIFICATION:
+- All checksums match source ✓
+- Nginx restart tested ✓
+- Nginx autostart enabled ✓
+- All asset paths working ✓
+- Permissions correct (ubuntu:ubuntu) ✓
+
+STATUS: DEPLOYED PERMANENTLY
+================================

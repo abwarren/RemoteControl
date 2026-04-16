@@ -1,0 +1,85 @@
+(function(){
+  clearInterval(window._n4p);
+  window._n4p=null;
+  const API='https://nuts4poker.com/collector/save';
+  let last='',count=0;
+
+  // Token parser (unchanged)
+  function tok(cls){
+    const h=(cls||'').split(/\s+/).filter(t=>/^icon-layer2_([hdcs])(a|k|q|j|10|[2-9])_p-c-d$/i.test(t));
+    if(!h.length)return null;
+    const m=h[h.length-1].match(/^icon-layer2_([hdcs])(a|k|q|j|10|[2-9])_p-c-d$/i);
+    return ({a:'A',k:'K',q:'Q',j:'J','10':'T'}[m[2].toLowerCase()]||m[2]).toUpperCase()+m[1].toLowerCase();
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // FIX: Extract ALL visible seats, not just hero
+  // ══════════════════════════════════════════════════════════════════════════
+  function getAllHands(){
+    const hands=[];
+    for(const seat of document.querySelectorAll('sg-poker-table-seat')){
+      const seen=new Set(),out=[];
+      for(const el of seat.querySelectorAll('.single-cart-view-p')){
+        const c=tok(el.getAttribute('class')||'');
+        if(c&&!seen.has(c)){seen.add(c);out.push(c);}
+      }
+      // Only include hands with 2+ cards (PLO4 = 4, PLO5 = 5, PLO6 = 6)
+      if(out.length>=2){
+        hands.push(out.join(''));
+      }
+    }
+    return hands;
+  }
+
+  // Get board cards (flop, turn, river)
+  function getBoard(){
+    const seen=new Set(),out=[];
+    const board=document.querySelector('sg-poker-board');
+    if(!board)return[];
+    for(const el of board.querySelectorAll('.single-cart-view-p')){
+      if(el.closest('sg-poker-table-seat'))continue;  // Skip hole cards
+      const c=tok(el.getAttribute('class')||'');
+      if(c&&!seen.has(c)){seen.add(c);out.push(c);}
+    }
+    return out.join('');
+  }
+
+  function send(text){
+    const x=new XMLHttpRequest();
+    x.open('POST',API);
+    x.setRequestHeader('Content-Type','application/json');
+    x.onload=function(){
+      try{
+        const d=JSON.parse(x.responseText);
+        if(!d.dup){
+          count++;
+          console.log('[N4P-MULTI] #'+count,text.split('\n').length+' hands',d);
+        }else{
+          console.log('[N4P-MULTI] dup');
+        }
+      }catch(e){console.error('[N4P-MULTI] err',x.responseText);}
+    };
+    x.onerror=function(){console.error('[N4P-MULTI] network error');};
+    x.send(JSON.stringify({text}));
+  }
+
+  function tick(){
+    const hands=getAllHands();
+    if(hands.length<2)return;  // Need at least 2 players for equity calc
+
+    const board=getBoard();
+
+    // Build multi-line format
+    let lines=hands.slice();
+    if(board)lines.push(board);
+
+    const text=lines.join('\n');
+    if(text===last)return;
+    last=text;
+    send(text);
+  }
+
+  window._n4p=setInterval(tick,1500);
+  tick();
+  console.log('[N4P-MULTI] v3 running - ALL seats - stop: clearInterval(window._n4p)');
+})();

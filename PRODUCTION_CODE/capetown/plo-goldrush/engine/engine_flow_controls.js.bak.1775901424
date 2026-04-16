@@ -1,0 +1,389 @@
+(() => {
+  const STORAGE_KEY = "engineFlowToggles";
+
+  const defaultState = {
+    autoFill: true,
+    autoRunFlop: true,
+    manualTurnOnly: true,
+    clearRiver: true
+  };
+
+  // Adaptive polling state
+  const FAST_POLL = 1500;        // 1.5s when active
+  const SLOW_POLL = 5000;        // 5s when idle
+  const IDLE_THRESHOLD = 30000;  // 30s no change = idle
+  const MAX_RETRY_DELAY = 30000; // Max 30s backoff on errors
+  
+  let lastDataChange = Date.now();
+  let currentInterval = FAST_POLL;
+  let pollTimer = null;
+  let lastFlop = null;
+  let lastSnapshotHash = null;
+  let isRunning = false;
+  let consecutiveErrors = 0;
+  let isPaused = false;
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // STATE & CONFIG
+  // ══════════════════════════════════════════════════════════════════════════
+
+  function loadState() {
+    try {
+      return { ...defaultState, ...(JSON.parse(localStorage.getItem(STORAGE_KEY)) || {}) };
+    } catch {
+      return { ...defaultState };
+    }
+  }
+
+  function saveState(state) {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    } catch (e) {
+      console.error('[AUTO] Failed to save state:', e);
+    }
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // EXTRACTION & VALIDATION
+  // ══════════════════════════════════════════════════════════════════════════
+
+  function extractFlop(text) {
+    if (!text) return null;
+    try {
+      const lines = text.split("\n").map(l => l.trim()).filter(Boolean);
+      for (const line of lines) {
+        if (line.length === 6) return line; // 3 cards (2 chars each)
+      }
+    } catch (e) {
+      console.error('[AUTO] extractFlop error:', e);
+    }
+    return null;
+  }
+
+  function extractPlayers(text) {
+    if (!text) return [];
+    try {
+      return text
+        .split("\n")
+        .map(l => l.trim())
+        .filter(l => l.length === 8 || l.length === 10 || l.length === 12);
+    } catch (e) {
+      console.error('[AUTO] extractPlayers error:', e);
+      return [];
+    }
+  }
+
+  function findTextarea() {
+    return document.querySelector('textarea[rows="14"]');
+  }
+
+  function findRunButton() {
+    try {
+      const buttons = [...document.querySelectorAll("button")];
+      return buttons.find(b => /run|calculate|eval|equity/i.test((b.innerText || "").trim()));
+    } catch (e) {
+      console.error('[AUTO] findRunButton error:', e);
+      return null;
+    }
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // DOM UPDATES
+  // ══════════════════════════════════════════════════════════════════════════
+
+  function setTextareaValue(textarea, value) {
+    if (!textarea) return;
+    try {
+      const nativeSetter = Object.getOwnPropertyDescriptor(
+        window.HTMLTextAreaElement.prototype,
+        "value"
+      ).set;
+
+      nativeSetter.call(textarea, value);
+      textarea.dispatchEvent(new Event("input", { bubbles: true }));
+      textarea.dispatchEvent(new Event("change", { bubbles: true }));
+    } catch (e) {
+      console.error('[AUTO] setTextareaValue error:', e);
+    }
+  }
+
+  function updateStatus(state) {
+    try {
+      const el = document.getElementById("engine-flow-status");
+      if (!el) return;
+      el.textContent =
+        `AUTO_FILL=${state.autoFill ? "ON" : "OFF"} | ` +
+        `AUTO_FLOP=${state.autoRunFlop ? "ON" : "OFF"} | ` +
+        `TURN=${state.manualTurnOnly ? "MANUAL" : "FREE"} | ` +
+        `CLEAR_RIVER=${state.clearRiver ? "ON" : "OFF"}`;
+    } catch (e) {
+      console.error('[AUTO] updateStatus error:', e);
+    }
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // UI CONTROLS
+  // ══════════════════════════════════════════════════════════════════════════
+
+  function ensureControls() {
+    const textarea = findTextarea();
+    if (!textarea) return null;
+    if (document.getElementById("engine-flow-controls")) return textarea;
+
+    try {
+      const wrap = document.createElement("div");
+      wrap.innerHTML = `
+        <div id="engine-flow-controls" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:10px;font-size:12px;">
+          <label><input type="checkbox" id="toggle-auto-fill"> Auto Fill</label>
+          <label><input type="checkbox" id="toggle-auto-flop"> Auto Run Flop</label>
+          <label><input type="checkbox" id="toggle-manual-turn"> Manual Turn Only</label>
+          <label><input type="checkbox" id="toggle-clear-river"> Clear River</label>
+          <span id="engine-flow-status" style="opacity:.8;"></span>
+        </div>
+      `;
+      textarea.parentNode.insertBefore(wrap.firstElementChild, textarea);
+
+      const state = loadState();
+
+      document.getElementById("toggle-auto-fill").checked = state.autoFill;
+      document.getElementById("toggle-auto-flop").checked = state.autoRunFlop;
+      document.getElementById("toggle-manual-turn").checked = state.manualTurnOnly;
+      document.getElementById("toggle-clear-river").checked = state.clearRiver;
+
+      ["toggle-auto-fill", "toggle-auto-flop", "toggle-manual-turn", "toggle-clear-river"].forEach(id => {
+        document.getElementById(id).addEventListener("change", () => {
+          const newState = {
+            autoFill: document.getElementById("toggle-auto-fill").checked,
+            autoRunFlop: document.getElementById("toggle-auto-flop").checked,
+            manualTurnOnly: document.getElementById("toggle-manual-turn").checked,
+            clearRiver: document.getElementById("toggle-clear-river").checked
+          };
+          saveState(newState);
+          updateStatus(newState);
+        });
+      });
+
+      updateStatus(state);
+    } catch (e) {
+      console.error('[AUTO] ensureControls error:', e);
+    }
+
+    return textarea;
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // SMART TRIGGER
+  // ══════════════════════════════════════════════════════════════════════════
+
+  async function maybeAutoRun(text) {
+    const state = loadState();
+    
+    // Must be enabled
+    if (!state.autoRunFlop) return;
+    
+    // Prevent concurrent runs
+    if (isRunning) return;
+
+    const players = extractPlayers(text);
+    const flop = extractFlop(text);
+
+    // 🔒 Guards
+    if (players.length < 6) {
+      console.log(`[AUTO] Skip: only ${players.length} players (need ≥6)`);
+      return;
+    }
+    if (!flop) return;
+    if (flop === lastFlop) {
+      console.log(`[AUTO] Skip: flop "${flop}" already processed`);
+      return;
+    }
+
+    // ✅ Lock state BEFORE run (prevents race)
+    lastFlop = flop;
+    isRunning = true;
+
+    try {
+      console.log(`[AUTO] Running equity on flop: "${flop}" (${players.length} players)`);
+      
+      const runBtn = findRunButton();
+      if (runBtn) {
+        runBtn.click();
+      } else {
+        console.warn('[AUTO] Run button not found');
+      }
+    } catch (e) {
+      console.error("[AUTO] Engine run failed:", e);
+    } finally {
+      setTimeout(() => {
+        isRunning = false;
+      }, 1000); // debounce window
+    }
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // ADAPTIVE POLLING
+  // ══════════════════════════════════════════════════════════════════════════
+
+  function adjustPollSpeed() {
+    try {
+      const timeSinceChange = Date.now() - lastDataChange;
+      const shouldBeIdle = timeSinceChange > IDLE_THRESHOLD;
+      const targetInterval = shouldBeIdle ? SLOW_POLL : FAST_POLL;
+
+      if (targetInterval !== currentInterval) {
+        currentInterval = targetInterval;
+
+        // Restart polling with new interval
+        if (pollTimer) clearTimeout(pollTimer);
+        scheduleNextPoll();
+
+        const mode = shouldBeIdle ? 'IDLE' : 'ACTIVE';
+        console.log(`[AUTO] Poll speed: ${mode} (${currentInterval}ms)`);
+      }
+    } catch (e) {
+      console.error('[AUTO] adjustPollSpeed error:', e);
+    }
+  }
+
+  function calculateBackoff() {
+    // Exponential backoff: 2s, 4s, 8s, 16s, max 30s
+    const delay = Math.min(2000 * Math.pow(2, consecutiveErrors), MAX_RETRY_DELAY);
+    return delay;
+  }
+
+  function scheduleNextPoll() {
+    if (isPaused) return;
+    
+    const delay = consecutiveErrors > 0 ? calculateBackoff() : currentInterval;
+    pollTimer = setTimeout(pollLatest, delay);
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // MAIN POLL LOOP
+  // ══════════════════════════════════════════════════════════════════════════
+
+  async function pollLatest() {
+    if (isPaused) return;
+
+    try {
+      const textarea = ensureControls();
+      if (!textarea) {
+        scheduleNextPoll();
+        return;
+      }
+
+      const state = loadState();
+
+      const res = await fetch("/api/collector/latest", { 
+        credentials: "include",
+        signal: AbortSignal.timeout(10000) // 10s timeout
+      });
+      
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}`);
+      }
+
+      const data = await res.json();
+      
+      if (!data.ok) {
+        scheduleNextPoll();
+        return;
+      }
+
+      // ✅ Success - reset error counter
+      if (consecutiveErrors > 0) {
+        console.log('[AUTO] Connection restored');
+        consecutiveErrors = 0;
+      }
+
+      const text = data.raw || "";
+
+      // 🔒 Snapshot guard: skip if data unchanged
+      if (text === lastSnapshotHash) {
+        adjustPollSpeed(); // Check if we should slow down
+        scheduleNextPoll();
+        return;
+      }
+      
+      // Data changed → update tracking
+      lastSnapshotHash = text;
+      lastDataChange = Date.now();
+
+      // Auto Fill
+      if (state.autoFill && text) {
+        setTextareaValue(textarea, text);
+      }
+
+      // 🔥 Smart trigger
+      await maybeAutoRun(text);
+
+      // Adaptive polling: speed up after activity
+      adjustPollSpeed();
+
+    } catch (err) {
+      consecutiveErrors++;
+      const backoff = calculateBackoff();
+      console.error(`[AUTO] Poll failed (${consecutiveErrors}x): ${err.message}, retry in ${backoff}ms`);
+    } finally {
+      scheduleNextPoll();
+    }
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // PAGE VISIBILITY HANDLING
+  // ══════════════════════════════════════════════════════════════════════════
+
+  function handleVisibilityChange() {
+    if (document.hidden) {
+      isPaused = true;
+      if (pollTimer) clearTimeout(pollTimer);
+      console.log('[AUTO] Tab hidden, pausing polling');
+    } else {
+      isPaused = false;
+      console.log('[AUTO] Tab visible, resuming polling');
+      pollLatest(); // Immediate poll on resume
+    }
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // INITIALIZATION
+  // ══════════════════════════════════════════════════════════════════════════
+
+  try {
+    ensureControls();
+    
+    // Export for manual control
+    window.engineFlowPollLatest = pollLatest;
+    window.engineFlowMaybeAutoRun = maybeAutoRun;
+    window.engineFlowGetState = () => ({
+      interval: currentInterval,
+      timeSinceChange: Date.now() - lastDataChange,
+      isIdle: (Date.now() - lastDataChange) > IDLE_THRESHOLD,
+      isPaused,
+      consecutiveErrors,
+      lastFlop
+    });
+    window.engineFlowPause = () => {
+      isPaused = true;
+      if (pollTimer) clearTimeout(pollTimer);
+      console.log('[AUTO] Polling paused manually');
+    };
+    window.engineFlowResume = () => {
+      isPaused = false;
+      pollLatest();
+      console.log('[AUTO] Polling resumed manually');
+    };
+
+    // Page visibility handling
+    if (document.addEventListener) {
+      document.addEventListener('visibilitychange', handleVisibilityChange);
+    }
+
+    // Auto-start adaptive polling
+    pollLatest();
+    console.log('[AUTO] Smart trigger enabled: auto-run on flop (≥6 players)');
+    console.log(`[AUTO] Adaptive: Fast=${FAST_POLL}ms, Slow=${SLOW_POLL}ms, Idle=${IDLE_THRESHOLD/1000}s`);
+  } catch (e) {
+    console.error('[AUTO] Initialization failed:', e);
+  }
+})();

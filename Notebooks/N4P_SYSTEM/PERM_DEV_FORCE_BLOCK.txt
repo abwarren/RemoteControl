@@ -1,0 +1,135 @@
+Content-Type: text/x-zim-wiki
+Wiki-Format: zim 0.6
+Creation-Date: 2026-04-02T09:45:44+02:00
+
+====== PERM DEV FORCE BLOCK ======
+Created Thursday 02 April 2026
+
+=========================================================
+SECTION G — PERMANENT DEPLOYMENT REQUIREMENT (MANDATORY)
+=========================================================
+
+MISSION EXTENSION:
+All frontend improvements MUST be deployed to production as a permanent change. No task is complete until production serves the updated static build.
+
+CRITICAL RULE:
+A frontend change that is not built and deployed to production static files is NOT considered complete.
+
+--------------------
+REQUIRED DEPLOY FLOW (NON-NEGOTIABLE)
+--------------------
+
+STEP 1 — BUILD
+- Run:
+  npm install
+  npm run build
+
+- Confirm:
+  - dist/ folder exists
+  - index.html updated
+  - hashed JS/CSS assets generated
+
+FAIL if build is skipped.
+
+--------------------
+
+STEP 2 — REPLACE PRODUCTION STATIC FILES
+
+- Identify production path (example):
+  /var/www/n4p/
+
+- Clean old assets:
+  rm -rf /var/www/n4p/*
+
+- Deploy new build:
+  cp -r dist/* /var/www/n4p/
+
+- Ensure:
+  - index.html is NEW
+  - assets/*.js is NEW
+  - assets/*.css is NEW
+  - no stale files remain
+
+FAIL if:
+- partial copy
+- old assets still present
+- dist not used
+
+--------------------
+
+STEP 3 — ENSURE PERSISTENCE
+
+Verify:
+- Files exist on persistent disk
+- Not inside temp container only
+- Not dependent on Vite dev server
+- Survive service reload/restart
+
+--------------------
+
+STEP 4 — RELOAD SERVING LAYER
+
+If nginx used:
+- nginx -t
+- systemctl reload nginx
+
+Ensure production now points to updated static files.
+
+--------------------
+
+STEP 5 — PRODUCTION VALIDATION
+
+Validate ALL:
+
+- https://nuts4poker.com/app/ loads
+- /remote shows visible buttons
+- /collector shows structured UI
+- /engine shows working UI
+- JS/CSS return HTTP 200
+- No blank screens
+- No stale assets
+- No console-breaking errors
+
+--------------------
+
+STEP 6 — PERMANENCE TEST
+
+- Reload nginx → UI still correct
+- Refresh browser → UI still correct
+- No dependency on local dev server
+- Static files remain after restart
+
+--------------------
+
+STRICT FAILURE CONDITIONS
+
+FAIL if ANY of the following:
+
+- Changes exist only in src/ but not in dist/
+- dist/ not deployed
+- Production still serving old assets
+- Dev server required for UI to work
+- Static files not replaced fully
+- UI disappears after restart
+- Remote buttons still missing
+
+--------------------
+
+SUCCESS CONDITION
+
+SUCCESS ONLY IF:
+
+- Frontend improved in source
+- Build completed successfully
+- dist/ deployed to production static path
+- Old static assets replaced
+- Production serves new UI
+- Changes persist after restart
+- Remote, Collector, Engine visibly improved
+
+--------------------
+
+FINAL RULE
+
+DO NOT mark task complete until:
+SOURCE UPDATED → BUILD COMPLETE → STATIC FILES REPLACED → PRODUCTION VERIFIED → PERSISTENCE CONFIRMED

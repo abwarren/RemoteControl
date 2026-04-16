@@ -1,0 +1,179 @@
+import eventlet
+eventlet.monkey_patch()
+
+from flask import Flask, jsonify, request
+from flask_cors import CORS
+import time
+import threading
+import uuid
+import os
+import hmac
+import hashlib
+import logging
+
+app = Flask(__name__)
+CORS(app, resources={r"/api/*": {"origins": "*"}})
+
+logging.basicConfig(level=logging.INFO)
+_logger = logging.getLogger(__name__)
+
+N4P_SEAT_SECRET = os.getenv('N4P_SEAT_SECRET', 'default-test-secret')
+TRACKER_API_KEY = os.getenv('TRACKER_API_KEY', 'trk_b4e8a6d2c9f3b7e1d4c8f0a2b5e9d3c7f1b4e8a6d2c9f3b7e1d4c8f0a2b5e9')
+
+_snapshot_store = {}      # key: "table_id:seat_index"
+_merged_tables = {}       # key: table_id
+_command_queue = {}       # key: seat_token
+_store_lock = threading.Lock()
+
+def generate_seat_token(table_id, seat_index):
+    msg = f"{table_id}:{seat_index}".encode("utf-8")
+    return hmac.new(N4P_SEAT_SECRET.encode("utf-8"), msg, hashlib.sha256).hexdigest()
+
+def merge_table(table_id):
+    with _store_lock:
+        table_seats = []
+        base = None
+        last_updated = 0.0
+        now = time.time()
+        for key, rec in list(_snapshot_store.items()):
+            if rec["table_id"] != table_id:
+                continue
+            if now - rec["last_seen"] > 60:  # stale cleanup
+                del _snapshot_store[key]
+                continue
+            snap = rec["last_snapshot"]
+            last_updated = max(last_updated, rec["last_seen"])
+            if base is None:
+                base = snap
+            hero = next((s for s in snap.get("seats", []) if s.get("is_hero")), None)
+            if hero:
+                token = rec.get("seat_token")
+                cmd = _command_queue.get(token)
+                table_seats.append({
+                    "seat_index": rec["seat_index"],
+                    "name": rec.get("name", "Unknown"),
+                    "stack_zar": rec.get("stack_zar", 0.0),
+                    "hole_cards": hero.get("hole_cards", []),
+                    "status": rec.get("status", "playing"),
+                    "is_dealer": rec["seat_index"] == base.get("dealer_seat"),
+                    "has_token": True,
+                    "last_seen_ago": now - rec["last_seen"],
+                    "pending_cmd": cmd.get("type") if cmd and cmd.get("status") == "pending" else None
+                })
+        if not base:
+            return None
+        return {
+            "table_id": table_id,
+            "variant": base.get("variant", "plo5-6max"),
+            "street": base.get("street", "PREFLOP"),
+            "pot_zar": base.get("pot_zar", 0.0),
+            "dealer_seat": base.get("dealer_seat"),
+            "board": base.get("board", {"flop": [], "turn": None, "river": None}),
+            "last_updated": last_updated,
+            "seats": sorted(table_seats, key=lambda s: s["seat_index"])
+        }
+
+@app.route("/api/health")
+def health():
+    return jsonify({"ok": True, "env": "test"})
+
+@app.route("/api/snapshot", methods=["POST"])
+def api_snapshot():
+    if request.headers.get("X-API-Key") != TRACKER_API_KEY:
+        return jsonify({"ok": False, "error": "Invalid API key"}), 401
+    payload = request.json or {}
+    table_id = payload.get("table_id")
+    if not table_id:
+        return jsonify({"ok": False, "error": "No table_id"}), 400
+    seats = payload.get("seats", [])
+    hero = next((s for s in seats if s.get("is_hero")), None)
+    if not hero:
+        return jsonify({"ok": False, "error": "No hero seat"}), 400
+    seat_index = hero.get("seat_index")
+    store_key = f"{table_id}:{seat_index}"
+    token = generate_seat_token(table_id, seat_index)
+    with _store_lock:
+        _snapshot_store[store_key] = {
+            "seat_token": token,
+            "table_id": table_id,
+            "seat_index": seat_index,
+            "last_snapshot": payload,
+            "last_seen": time.time(),
+            "status": hero.get("status", "playing"),
+            "name": hero.get("name"),
+            "stack_zar": hero.get("stack_zar"),
+        }
+        _merged_tables[table_id] = merge_table(table_id)
+    return jsonify({"ok": True, "seat_token": token, "seat_index": seat_index, "table_id": table_id})
+
+@app.route("/api/commands/pending")
+def api_commands_pending():
+    token = request.args.get("token")
+    if not token:
+        return jsonify({"ok": False, "error": "No token"}), 400
+    with _store_lock:
+        cmd = _command_queue.get(token)
+        if cmd and cmd.get("status") == "pending":
+            return jsonify({"ok": True, "command": cmd})
+        return jsonify({"ok": True, "command": None})
+
+@app.route("/api/commands/ack", methods=["POST"])
+def api_commands_ack():
+    payload = request.json or {}
+    token = payload.get("token")
+    command_id = payload.get("command_id")
+    with _store_lock:
+        cmd = _command_queue.get(token)
+        if cmd and cmd.get("id") == command_id:
+            cmd["status"] = "acked"
+            _command_queue[token] = None
+    return jsonify({"ok": True})
+
+@app.route("/api/commands/queue", methods=["POST"])
+def api_commands_queue():
+    payload = request.json or {}
+    table_id = payload.get("table_id")
+    seat_index = payload.get("seat_index")
+    command_type = payload.get("command_type")
+    if not all([table_id, seat_index is not None, command_type]):
+        return jsonify({"ok": False, "error": "Missing fields"}), 400
+    token = generate_seat_token(table_id, seat_index)
+    store_key = f"{table_id}:{seat_index}"
+    with _store_lock:
+        if store_key not in _snapshot_store:
+            return jsonify({"ok": False, "error": "Seat not connected"}), 404
+        command_id = str(uuid.uuid4())[:8]
+        _command_queue[token] = {
+            "id": command_id,
+            "type": command_type,
+            "queued_at": time.time(),
+            "status": "pending"
+        }
+        _merged_tables[table_id] = merge_table(table_id)
+    return jsonify({"ok": True, "command_id": command_id})
+
+@app.route("/api/table/<table_id>")
+def api_table(table_id):
+    with _store_lock:
+        if table_id == "latest" and _merged_tables:
+            table_id = max(_merged_tables.keys(), key=lambda k: _merged_tables[k].get("last_updated", 0))
+        table = _merged_tables.get(table_id)
+        if not table:
+            return jsonify({"ok": False, "error": "Table not found"}), 404
+        return jsonify({"ok": True, "table": table})
+
+@app.route("/api/tables")
+def api_tables():
+    with _store_lock:
+        tables = list(_merged_tables.values())
+        tables.sort(key=lambda t: t.get("last_updated", 0), reverse=True)
+        return jsonify({"ok": True, "tables": tables})
+
+from collector_routes import register_collector_routes
+register_collector_routes(app)
+
+from equity_routes import register_equity_routes
+register_equity_routes(app)
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=8081)

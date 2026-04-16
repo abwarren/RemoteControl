@@ -1,0 +1,301 @@
+(() => {
+  const STORAGE_KEY = "engineFlowToggles";
+
+  const defaultState = {
+    autoFill: true,
+    autoRunFlop: true,
+    manualTurnOnly: true,
+    clearRiver: true
+  };
+
+  function loadState() {
+    try {
+      return { ...defaultState, ...(JSON.parse(localStorage.getItem(STORAGE_KEY)) || {}) };
+    } catch {
+      return { ...defaultState };
+    }
+  }
+
+  function saveState(state) {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  }
+
+  function updateStatus(state) {
+    const el = document.getElementById("engine-flow-status");
+    if (!el) return;
+    el.textContent =
+      `AUTO_FILL=${state.autoFill ? "ON" : "OFF"} | ` +
+      `AUTO_FLOP=${state.autoRunFlop ? "ON" : "OFF"} | ` +
+      `TURN=${state.manualTurnOnly ? "MANUAL" : "FREE"} | ` +
+      `CLEAR_RIVER=${state.clearRiver ? "ON" : "OFF"}`;
+  }
+
+  function ensureControls() {
+    const textarea = document.querySelector('textarea[rows="14"]');
+    if (!textarea) return null;
+    if (document.getElementById("engine-flow-controls")) return textarea;
+
+    const wrap = document.createElement("div");
+    wrap.innerHTML = `
+      <div id="engine-flow-controls" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:10px;font-size:12px;">
+        <label><input type="checkbox" id="toggle-auto-fill"> Auto Fill</label>
+        <label><input type="checkbox" id="toggle-auto-flop"> Auto Run Flop</label>
+        <label><input type="checkbox" id="toggle-manual-turn"> Manual Turn Only</label>
+        <label><input type="checkbox" id="toggle-clear-river"> Clear River</label>
+        <span id="engine-flow-status" style="opacity:.8;"></span>
+      </div>
+    `;
+    textarea.parentNode.insertBefore(wrap.firstElementChild, textarea);
+
+    const state = loadState();
+
+    document.getElementById("toggle-auto-fill").checked = state.autoFill;
+    document.getElementById("toggle-auto-flop").checked = state.autoRunFlop;
+    document.getElementById("toggle-manual-turn").checked = state.manualTurnOnly;
+    document.getElementById("toggle-clear-river").checked = state.clearRiver;
+
+    ["toggle-auto-fill", "toggle-auto-flop", "toggle-manual-turn", "toggle-clear-river"].forEach(id => {
+      document.getElementById(id).addEventListener("change", () => {
+        const newState = {
+          autoFill: document.getElementById("toggle-auto-fill").checked,
+          autoRunFlop: document.getElementById("toggle-auto-flop").checked,
+          manualTurnOnly: document.getElementById("toggle-manual-turn").checked,
+          clearRiver: document.getElementById("toggle-clear-river").checked
+        };
+        saveState(newState);
+        updateStatus(newState);
+      });
+    });
+
+    updateStatus(state);
+    return textarea;
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // 🔒 HARDENED INLINE ADAPTIVE POLLER (self-contained version)
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  const FAST_POLL = 1500;
+  const SLOW_POLL = 5000;
+  const IDLE_THRESHOLD = 30000;
+  const MAX_FAILURES = 3;
+  const FETCH_TIMEOUT = 10000;
+
+  let currentPollInterval = FAST_POLL;
+  let lastActivityTime = Date.now();
+  let pollTimer = null;
+  let consecutiveFailures = 0;
+  let lastSnapshotHash = null;
+  let isPaused = false;
+
+  async function fetchWithTimeout(url, options = {}, timeout = FETCH_TIMEOUT) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeout);
+    try {
+      const response = await fetch(url, { ...options, signal: controller.signal });
+      clearTimeout(timeoutId);
+      return response;
+    } catch (error) {
+      clearTimeout(timeoutId);
+      if (error.name === 'AbortError') throw new Error('Request timeout');
+      throw error;
+    }
+  }
+
+  function handleVisibilityChange() {
+    if (!document.hidden && !isPaused) {
+      console.log("[POLL] Page visible - resuming");
+      scheduleNextPoll();
+    } else if (document.hidden && pollTimer) {
+      console.log("[POLL] Page hidden - pausing");
+      clearTimeout(pollTimer);
+    }
+  }
+
+  document.addEventListener('visibilitychange', handleVisibilityChange);
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // 🔥 Smart trigger logic
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  let lastFlop = null;
+  let isRunning = false;
+
+  function extractFlop(snapshot) {
+    const board = snapshot?.table?.board;
+    if (!board) return null;
+    if (Array.isArray(board)) {
+      return board.length >= 3 ? board.slice(0, 3).join('') : null;
+    }
+    const flop = board.flop || [];
+    return flop.length === 3 ? flop.join('') : null;
+  }
+
+  function extractPlayers(snapshot) {
+    const seats = snapshot?.table?.seats || [];
+    return seats.filter(s => s && s.hole_cards && s.hole_cards.length >= 4);
+  }
+
+  function setTextareaValue(textarea, value) {
+    const nativeSetter = Object.getOwnPropertyDescriptor(
+      window.HTMLTextAreaElement.prototype,
+      "value"
+    ).set;
+    nativeSetter.call(textarea, value);
+    textarea.dispatchEvent(new Event("input", { bubbles: true }));
+    textarea.dispatchEvent(new Event("change", { bubbles: true }));
+  }
+
+  function buildEnginePayload(snapshot) {
+    const seats = snapshot?.table?.seats || [];
+    return seats.map(s => (s.hole_cards || []).join("")).filter(Boolean).join("\n");
+  }
+
+  function clickRunButton() {
+    const btn = [...document.querySelectorAll("button")]
+      .find(b => /run|calculate|eval|equity/i.test((b.innerText || "").trim()));
+    if (btn) {
+      console.log("[AUTO] Clicking Run button");
+      btn.click();
+    }
+  }
+
+  async function maybeAutoRun(snapshot) {
+    const state = loadState();
+    if (!state.autoRunFlop || isRunning) return;
+
+    const players = extractPlayers(snapshot);
+    const flop = extractFlop(snapshot);
+
+    if (players.length < 6) {
+      console.log("[AUTO] Skipped: only", players.length, "players (need ≥6)");
+      return;
+    }
+    if (!flop) {
+      console.log("[AUTO] Skipped: no valid flop");
+      return;
+    }
+    if (flop === lastFlop) {
+      console.log("[AUTO] Skipped: duplicate flop", flop);
+      return;
+    }
+
+    lastFlop = flop;
+    isRunning = true;
+
+    try {
+      console.log("[AUTO] ✓ NEW FLOP DETECTED:", flop, "with", players.length, "players");
+      
+      const textarea = ensureControls();
+      if (textarea && state.autoFill) {
+        const payload = buildEnginePayload(snapshot);
+        if (payload) {
+          setTextareaValue(textarea, payload);
+          console.log("[AUTO] Filled textarea with", players.length, "hands");
+        }
+      }
+
+      setTimeout(() => clickRunButton(), 300);
+    } catch (e) {
+      console.error("[AUTO] Engine run failed:", e);
+    } finally {
+      setTimeout(() => { isRunning = false; }, 1000);
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // 🔌 Hardened polling loop
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  function scheduleNextPoll() {
+    if (pollTimer) clearTimeout(pollTimer);
+    if (!navigator.onLine || document.hidden || isPaused) return;
+
+    const timeSinceActivity = Date.now() - lastActivityTime;
+    
+    if (timeSinceActivity > IDLE_THRESHOLD && currentPollInterval === FAST_POLL) {
+      currentPollInterval = SLOW_POLL;
+      console.log("[POLL] Entering idle mode (5s)");
+    }
+
+    const backoff = consecutiveFailures > 0 
+      ? Math.min(currentPollInterval * Math.pow(2, consecutiveFailures - 1), 30000)
+      : currentPollInterval;
+
+    pollTimer = setTimeout(async () => {
+      await pollLatest();
+      scheduleNextPoll();
+    }, backoff);
+  }
+
+  function recordActivity() {
+    const wasIdle = currentPollInterval === SLOW_POLL;
+    lastActivityTime = Date.now();
+    consecutiveFailures = 0;
+    
+    if (wasIdle) {
+      currentPollInterval = FAST_POLL;
+      console.log("[POLL] Activity detected, fast mode (1.5s)");
+    }
+  }
+
+  async function pollLatest() {
+    try {
+      const res = await fetchWithTimeout("/api/table/latest", { credentials: "include" });
+
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}`);
+      }
+
+      const json = await res.json();
+      if (!json?.ok) {
+        consecutiveFailures++;
+        return;
+      }
+
+      const snapshotHash = JSON.stringify({
+        board: json?.table?.board,
+        seats: json?.table?.seats?.map(s => s?.hole_cards).filter(Boolean)
+      });
+
+      if (snapshotHash === lastSnapshotHash) return;
+
+      recordActivity();
+      lastSnapshotHash = snapshotHash;
+      consecutiveFailures = 0;
+
+      const state = loadState();
+      const textarea = ensureControls();
+
+      if (textarea && state.autoFill) {
+        const payload = buildEnginePayload(json);
+        if (payload) setTextareaValue(textarea, payload);
+      }
+
+      await maybeAutoRun(json);
+
+    } catch (error) {
+      consecutiveFailures++;
+      console.error(`[POLL] Error (${consecutiveFailures}/${MAX_FAILURES}):`, error.message);
+    }
+  }
+
+  function init() {
+    const checkInterval = setInterval(() => {
+      if (ensureControls()) {
+        clearInterval(checkInterval);
+        console.log("[AUTO] 🔒 Hardened adaptive polling active");
+        scheduleNextPoll();
+      }
+    }, 500);
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", init);
+  } else {
+    init();
+  }
+
+  window.engineFlowProcessSnapshot = maybeAutoRun;
+  window.engineFlowPollLatest = pollLatest;
+})();

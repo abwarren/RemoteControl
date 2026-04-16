@@ -1,0 +1,28 @@
+version: '3.8'
+
+services:
+  plo-engine:
+    build: .
+    container_name: plo-equity-engine
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - FLASK_ENV=production
+      - N4P_SEAT_SECRET=${N4P_SEAT_SECRET:-your_secret_change_me}
+      - TRACKER_API_KEY=${TRACKER_API_KEY:-trk_default}
+    volumes:
+      # Optional: mount logs directory
+      - ./logs:/app/logs
+    networks:
+      - plo-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+networks:
+  plo-network:
+    driver: bridge

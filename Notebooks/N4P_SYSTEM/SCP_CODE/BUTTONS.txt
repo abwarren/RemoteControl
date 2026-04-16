@@ -1,0 +1,85 @@
+Content-Type: text/x-zim-wiki
+Wiki-Format: zim 0.6
+Creation-Date: 2026-04-02T10:35:08+02:00
+
+====== BUTTONS ======
+Created Thursday 02 April 2026
+
+the actual seat 
+
+body > sg-app > div > sg-lobby > div > div > sg-poker-table > div > sg-poker-board > div > div > div > div.full-table-w-p.player-count-6 > sg-poker-table-seat.player-1 > div > span
+
+AFTER CLICKING ON THE SEAT A DIALOG BOX popos up with the below selectors 
+
+BUY-IN
+body > sg-app > div > sg-lobby > div > div > sg-poker-table > sg-modal > div > div > div > div > sg-buy-in-modal > div > div > div.modal-button-container > ul > li:nth-child(1) > button
+
+Textarea for ZAR inpput value 
+
+body > sg-app > div > sg-lobby > div > div > sg-poker-table > sg-modal > div > div > div > div > sg-buy-in-modal > div > div > div.modal-balance-v > ul > [[li:nth-child(2)]]
+
+MAX
+
+body > sg-app > div > sg-lobby > div > div > sg-poker-table > sg-modal > div > div > div > div > sg-buy-in-modal > div > div > div.modal-balance-v > ul > li:nth-child(2) > div.mini-button-view-m.last-v-p > button
+
+MIN 
+
+''body > sg-app > div > sg-lobby > div > div > sg-poker-table > sg-modal > div > div > div > div > sg-buy-in-modal > div > div > div.modal-balance-v > ul > li:nth-child(2) > div.mini-button-view-m.first-v-p > button''
+
+TICK BOX - AUTO TOP UP 
+body > sg-app > div > sg-lobby > div > div > sg-poker-table > sg-modal > div > div > div > div > sg-buy-in-modal > div > div > div.accept-info-m > label:nth-child(2) > span
+
+TOP-UP BUTTON WHILE IN PLAY 
+body > sg-app > div > sg-lobby > div > div > sg-poker-table > div > div.table-header-v-right > div > div:nth-child(2) > span
+
+THIS SELECTS THE MAX VALUE YOU CAN BET WHILE THE ACTION IS ON YOU == HINT THIS BUTTON IS ONLY AVAILAble while its your turn to play 
+body > sg-app > div > sg-lobby > div > div > sg-poker-table > div > sg-poker-table-footer > div > div.f-right-column-p > ul > li:nth-child(2) > div > p > i
+
+THIS BUTTON EXECUTES TEH ABOVE VALUE SELECTED 
+body > sg-app > div > sg-lobby > div > div > sg-poker-table > div > sg-poker-table-footer > div > div.f-right-column-p > ul > li:nth-child(3) > div > p > i
+
+CALL BUTTON WHILE ACTION IS ON YOU 
+body > sg-app > div > sg-lobby > div > div > sg-poker-table > div > sg-poker-table-footer > div > div.f-right-column-p > ul > li:nth-child(2) > div > p
+
+body > sg-app > div > sg-lobby > div > div > sg-poker-table > div > sg-poker-table-footer > div > div.f-right-column-p > sg-poker-betting-slider
+
+cashout button
+body > sg-app > div > sg-lobby > div > div > sg-poker-table > div > sg-poker-table-footer > div > div.f-right-column-p > ul > li:nth-child(3) > div > p > i
+
+body > sg-app > div > sg-lobby > div > div > sg-poker-table > div > sg-poker-table-footer > div > div.f-right-column-p > ul > li:nth-child(3) > div > p > i
+
+
+
+#95–113 (BetSlip / Popup / Floating Buttons / reCAPTCHA / Agent)
+95. div.layout-betslip-holder-bc
+96. div.popup-holder-bc.windowed.hidden.content-manager
+97. div.popup-middleware-bc
+98. div#base_popup_id.popup-inner-bc
+99. div#b_phv8fz3a_211
+100. div (no classes/id)
+101. div.circleRollButton
+102. div.circleRollButtonText
+103. div.circleRollButtonSpin
+104. div.circleRollButtonOuter
+105. div.circleRollButtonInner
+106. div.circleRollButtonIcon
+107. div (no classes/id)
+108. div (no classes/id)
+109. div.grecaptcha-badge
+110. div.grecaptcha-logo
+111. div.grecaptcha-error
+112. div#claude-agent-glow-border
+113. div#claude-agent-stop-container
+
+Summary: There are 113 <div> elements total on the page. A few (indices 36, 49, 52, 100, 107, 108) have no classes or IDs assigned. The naming follows a consistent BEM-like convention (e.g., -bc suffix for base components, footer*, casino*, swiper*, etc.).
+
+
+undefined
+
+
+Cash Out
+
+
+THAT IS THE CSS SELECTOR FOR CASHOUT 
+.cash_out-c > p:nth-child(1) > i:nth-child(2)   
+

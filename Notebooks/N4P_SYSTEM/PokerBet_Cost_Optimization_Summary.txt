@@ -1,0 +1,81 @@
+# PokerBet Cost Optimization - Quick Summary
+**Target:** $140/month (40% reduction from $231.50)  
+**Savings:** $91.50/month = $1,098/year  
+
+---
+
+## Two Simple Changes
+
+### 1. Self-Host PostgreSQL on Processing Instance
+**Current:** RDS db.t3.medium = $99/month  
+**Optimized:** PostgreSQL on existing EC2 = $8/month (EBS only)  
+**Savings:** $91/month  
+
+**What to do:**
+```bash
+# Install PostgreSQL on Processing Instance
+sudo apt-get install postgresql-14
+
+# Configure for t3.medium (4GB RAM)
+shared_buffers = 1GB
+effective_cache_size = 3GB
+
+# Daily backups to S3
+pg_dump poker_data | gzip > backup.sql.gz
+aws s3 cp backup.sql.gz s3://poker-backups/
+```
+
+**Risk:** No RDS automation  
+**Mitigation:** Daily backup script + monitoring
+
+---
+
+### 2. Aggressive S3 Glacier Transition
+**Current:** 90-day Standard → Glacier = $150/month  
+**Optimized:** 30-day Standard → Glacier = $100/month  
+**Savings:** $50/month  
+
+**What to do:**
+```json
+{
+  "Rules": [{
+    "Transitions": [
+      {"Days": 30, "StorageClass": "GLACIER_INSTANT_RETRIEVAL"}
+    ]
+  }]
+}
+```
+
+Apply:
+```bash
+aws s3api put-bucket-lifecycle-configuration \
+  --bucket poker-raw-data \
+  --lifecycle-configuration file://policy.json
+```
+
+**Trade-off:** More data in Glacier (still instant retrieval)
+
+---
+
+## Cost Breakdown
+
+| Component | Standard | Optimized | Savings |
+|-----------|----------|-----------|---------|
+| PostgreSQL | $99/mo | $8/mo | -$91 |
+| S3 Storage | $150/mo | $100/mo | -$50 |
+| Lambda | $2/mo | $2/mo | $0 |
+| **TOTAL** | **$231.50** | **$140** | **-$91.50** |
+
+---
+
+## Implementation Time
+- PostgreSQL migration: 3 days
+- S3 policy update: 1 day
+- Testing: 3 days
+- **Total: 1 week**
+
+---
+
+## Files
+- **Full Plan:** POKERBET_COST_OPTIMIZATION_140.md (90KB)
+- **This Summary:** POKERBET_COST_OPTIMIZATION_SUMMARY.md (3KB)

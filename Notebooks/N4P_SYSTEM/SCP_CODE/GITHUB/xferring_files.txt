@@ -1,0 +1,168 @@
+Content-Type: text/x-zim-wiki
+Wiki-Format: zim 0.6
+Creation-Date: 2026-04-01T23:53:57+02:00
+
+====== xferring files ======
+Created Wednesday 01 April 2026
+
+15.240.57.158 = public dashboard / reverse proxy
+MAIN_PROD = existing EC2 (private control + ingest)
+No internal ports exposed to internet 🔒
+Agent has SSH + AWS CLI access
+
+GENT INSTRUCTION — SPLIT PUBLIC DASHBOARD + PRIVATE CONTROL PLANE
+🎯 Objective
+
+Deploy a public dashboard node (15.240.57.158) that serves UI via Nginx, while keeping all bot control + ingest endpoints private on MAIN_PROD.
+
+No internal control ports must be exposed to the internet.
+
+Internet
+   ↓
+15.240.57.158 (Public EC2)
+   - Nginx (public)
+   - Dashboard UI
+   - Reverse proxy ONLY for safe routes
+
+   ↓ (private VPC traffic only)
+
+MAIN_PROD EC2 (Private)
+   - Bot orchestrator
+   - Worker ingest API
+   - Internal control endpoints
+
+   ↑
+Scraper EC2 instances (private only)
+
+SECURITY RULES (MANDATORY)
+1. MAIN_PROD Security Group
+
+ALLOW:
+
+TCP INTERNAL_API_PORT (e.g. 8080)
+Source: sg-scrapers
+Source: sg-dashboard (15.240.57.158)
+
+DENY:
+
+Any 0.0.0.0/0 on internal ports ❌
+
+3. Scraper EC2 Security Group
+
+ALLOW OUTBOUND:
+
+TCP INTERNAL_API_PORT → MAIN_PROD private IP or SG
+
+⚙️ STEP 1 — SSH INTO DASHBOARD NODE
+ssh -i <key.pem> ubuntu@15.240.57.158
+⚙️ STEP 2 — INSTALL NGINX
+sudo apt update
+sudo apt install -y nginx
+sudo systemctl enable nginx
+sudo systemctl start nginx
+⚙️ STEP 3 — DEPLOY DASHBOARD FILES
+
+Agent must:
+
+# From local or MAIN_PROD
+scp -i <key.pem> -r ./dashboard/* ubuntu@15.240.57.158:/var/www/dashboard/
+
+Then on server:
+
+sudo mkdir -p /var/www/dashboard
+sudo chown -R ubuntu:ubuntu /var/www/dashboard
+⚙️ STEP 4 — CONFIGURE NGINX (CRITICAL SPLIT)
+
+Create config:
+
+sudo nano /etc/nginx/sites-available/dashboard
+NGINX CONFIG
+server {
+	listen 80;
+	server_name 15.240.57.158;
+
+	root /var/www/dashboard;
+	index index.html;
+
+	# PUBLIC UI
+	location / {
+		try_files $uri $uri/ =404;
+	}
+
+	# SAFE PUBLIC API (optional)
+	location /api/public/ {
+		proxy_pass http://MAIN_PROD_PRIVATE_IP:5000;
+		proxy_set_header Host $host;
+	}
+
+	# 🚫 BLOCK ALL INTERNAL ROUTES
+	location /api/internal/ {
+		deny all;
+		return 403;
+	}
+
+	location /bot-control/ {
+		deny all;
+		return 403;
+	}
+}
+
+Enable:
+
+sudo ln -s /etc/nginx/sites-available/dashboard /etc/nginx/sites-enabled/
+sudo nginx -t
+sudo systemctl restart nginx
+⚙️ STEP 5 — ENSURE MAIN_PROD BINDS TO PRIVATE INTERFACE
+
+On MAIN_PROD:
+
+Flask / API must NOT bind publicly
+
+BAD ❌
+
+app.run(host="0.0.0.0")
+
+GOOD ✅ (or firewall restrict)
+
+app.run(host="0.0.0.0", port=5000)
+
+BUT enforce via SG:
+
+only scraper SG + dashboard SG can reach it
+⚙️ STEP 6 — UPDATE SCRAPER WORKERS
+
+Replace any public endpoint:
+
+OLD:
+http://15.240.57.158:5000/api/ingest
+
+NEW:
+http://MAIN_PROD_PRIVATE_IP:5000/api/ingest
+
+Workers must use private IP only.
+
+⚙️ STEP 7 — VALIDATION CHECKS
+From scraper instance:
+curl http://MAIN_PROD_PRIVATE_IP:5000/health
+From internet:
+curl http://15.240.57.158
+MUST FAIL:
+curl http://15.240.57.158/api/internal/
+🚨 HARD RULES (DO NOT VIOLATE)
+❌ Never expose bot-control endpoints publicly
+❌ Never proxy internal routes through Nginx
+❌ Never allow 0.0.0.0/0 on ingest/control ports
+✅ Only private IP + SG-based access
+✅ Dashboard is UI only
+🧠 OPTIONAL HARDENING (RECOMMENDED)
+Add Cloudflare / HTTPS (Certbot)
+Add basic auth to dashboard
+Move internal API behind internal NLB
+Use VPC peering / PrivateLink if cross-account
+✅ FINAL STATE
+Component	Exposure
+Dashboard UI	🌐 Public
+Nginx	🌐 Public
+Bot Control API	🔒 Private
+Worker Ingest	🔒 Private
+Scraper Traffic	🔒 Private

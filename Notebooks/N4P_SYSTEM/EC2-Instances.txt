@@ -1,0 +1,7 @@
+Content-Type: text/x-zim-wiki
+Wiki-Format: zim 0.6
+Creation-Date: 2026-04-03T12:02:00+02:00
+
+====== EC2-Instances ======
+Created Friday 03 April 2026
+

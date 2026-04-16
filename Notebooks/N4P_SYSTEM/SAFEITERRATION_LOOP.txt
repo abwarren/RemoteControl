@@ -1,0 +1,15 @@
+Content-Type: text/x-zim-wiki
+Wiki-Format: zim 0.6
+Creation-Date: 2026-04-02T09:45:17+02:00
+
+====== SAFEITERRATION LOOP ======
+
+Execute a safe iterative optimization loop.
+
+On each pass:
+- Identify inefficiencies, weak UI/UX, or structural issues
+- Improve them without altering functional behavior
+- Preserve all routes, API contracts, and working features
+- Prefer enhancing existing components over replacing them
+
+Stop only when additional changes no longer produce meaningful improvement.

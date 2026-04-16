@@ -1,0 +1,102 @@
+(function(){
+  clearInterval(window._n4p);
+  window._n4p=null;
+
+  const API='https://nuts4poker.com/collector/save';
+  let last='',count=0;
+
+  // Token parser (card class → card notation)
+  function tok(cls){
+    const h=(cls||'').split(/\s+/).filter(t=>/^icon-layer2_([hdcs])(a|k|q|j|10|[2-9])_p-c-d$/i.test(t));
+    if(!h.length)return null;
+    const m=h[h.length-1].match(/^icon-layer2_([hdcs])(a|k|q|j|10|[2-9])_p-c-d$/i);
+    return ({a:'A',k:'K',q:'Q',j:'J','10':'T'}[m[2].toLowerCase()]||m[2]).toUpperCase()+m[1].toLowerCase();
+  }
+
+  // Get ALL players' hole cards (not just hero)
+  function getAllPlayers(){
+    const players = [];
+    for(const seat of document.querySelectorAll('sg-poker-table-seat')){
+      const seen=new Set(),out=[];
+      for(const el of seat.querySelectorAll('.single-cart-view-p')){
+        const c=tok(el.getAttribute('class')||'');
+        if(c&&!seen.has(c)){seen.add(c);out.push(c);}
+      }
+      // Only add if we have 2+ cards (PLO usually 4)
+      if(out.length>=2){
+        players.push(out.join(''));
+      }
+    }
+    return players;
+  }
+
+  // Get board cards (flop/turn/river)
+  function getBoard(){
+    const seen=new Set(),out=[];
+    const board=document.querySelector('sg-poker-board');
+    if(!board)return[];
+    for(const el of board.querySelectorAll('.single-cart-view-p')){
+      if(el.closest('sg-poker-table-seat'))continue;
+      const c=tok(el.getAttribute('class')||'');
+      if(c&&!seen.has(c)){seen.add(c);out.push(c);}
+    }
+    return out;
+  }
+
+  // Build full table snapshot
+  function buildSnapshot(){
+    const players = getAllPlayers();
+    const board = getBoard();
+
+    // Need at least 1 player to proceed
+    if(!players.length) return '';
+
+    // Format: one line per player, then board (if exists)
+    let lines = players.slice();  // Copy player hands
+
+    // Add board if we have flop (3+ cards)
+    if(board.length >= 3){
+      lines.push(board.join(''));
+    }
+
+    return lines.join('\n');
+  }
+
+  // Send to collector
+  function send(text){
+    const x=new XMLHttpRequest();
+    x.open('POST',API);
+    x.setRequestHeader('Content-Type','application/json');
+    x.onload=function(){
+      try{
+        const d=JSON.parse(x.responseText);
+        if(!d.dup){
+          count++;
+          console.log('[N4P] #'+count,text.split('\n').length+'lines',d);
+        }else{
+          console.log('[N4P] dup');
+        }
+      }catch(e){
+        console.error('[N4P] err',x.responseText);
+      }
+    };
+    x.onerror=function(){
+      console.error('[N4P] network error');
+    };
+    x.send(JSON.stringify({text}));
+  }
+
+  // Main tick
+  function tick(){
+    const snapshot = buildSnapshot();
+    if(!snapshot) return;
+    if(snapshot===last) return;
+
+    last=snapshot;
+    send(snapshot);
+  }
+
+  window._n4p=setInterval(tick,1500);
+  tick();
+  console.log('[N4P] v3-full-table running - stop: clearInterval(window._n4p)');
+})();

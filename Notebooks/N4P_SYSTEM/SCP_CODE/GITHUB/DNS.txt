@@ -1,0 +1,30 @@
+Content-Type: text/x-zim-wiki
+Wiki-Format: zim 0.6
+Creation-Date: 2026-04-02T00:45:15+02:00
+
+====== DNS ======
+Created Thursday 02 April 2026
+
+Name
+Data
+TTL
+Delete
+Edit
+
+a	@	15.240.57.158	1 Hour		
+
+ns	@	ns47.domaincontrol.com.	1 Hour	
+Can't delete
+Can't edit
+
+ns	@	ns48.domaincontrol.com.	1 Hour	
+Can't delete
+Can't edit
+
+cname	www	nuts4poker.com.	1 Hour		
+
+cname	_domainconnect	_domainconnect.gd.domaincontrol.com.	1 Hour		
+
+soa	@	Primary nameserver: ns47.domaincontrol.com.	1 Hour		
+
+txt	@	http://102.133.146.53/	1/2 Hour

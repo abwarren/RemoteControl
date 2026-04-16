@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Nuts4Poker Hand Collector — Auto Flow</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #0d0d0d;
+      color: #e0e0e0;
+      font-family: 'Segoe UI', Arial, sans-serif;
+      font-size: 14px;
+      padding: 24px 20px;
+      max-width: 860px;
+      margin: 0 auto;
+    }
+    h1 {
+      font-size: 20px;
+      font-weight: 600;
+      color: #fff;
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    h1 span.dot {
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      background: #ff6b6b;
+      display: inline-block;
+    }
+    h1 span.dot.live { background: #90ee90; animation: pulse 1.4s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+    .box {
+      background: #1a1a1a;
+      border: 1px solid #2a2a2a;
+      border-radius: 10px;
+      padding: 16px;
+      margin-bottom: 16px;
+    }
+    .box-title {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      color: #666;
+      margin-bottom: 12px;
+    }
+    textarea {
+      width: 100%;
+      height: 200px;
+      background: #111;
+      border: 1px solid #333;
+      border-radius: 7px;
+      color: #ffd166;
+      font-family: monospace;
+      font-size: 14px;
+      padding: 10px;
+      resize: vertical;
+      outline: none;
+      line-height: 1.9;
+    }
+    textarea:focus { border-color: #555; }
+    .row { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; align-items: center; }
+    button {
+      padding: 7px 14px;
+      border-radius: 7px;
+      border: 1px solid #444;
+      background: #222;
+      color: #ccc;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 500;
+    }
+    button:hover { background: #2e2e2e; color: #fff; }
+    button.primary { background: #1a3a1a; border-color: #2d6a2d; color: #90ee90; }
+    button.primary:hover { background: #234a23; }
+    button.trigger { background: #2a1a4a; border-color: #4a2d6a; color: #bb90ee; }
+    button.trigger:hover { background: #3a2a5a; }
+    button.danger  { background: #2a1010; border-color: #6a2020; color: #ff6b6b; }
+    button.danger:hover  { background: #3a1010; }
+    .stage-badge {
+      font-size: 11px;
+      font-family: monospace;
+      padding: 3px 8px;
+      border-radius: 5px;
+      background: #1a1a1a;
+      border: 1px solid #333;
+      color: #666;
+      margin-left: auto;
+    }
+    .stage-badge.preflop { background: #2a2010; border-color: #6a4a10; color: #ffd166; }
+    .stage-badge.flop { background: #1a3a1a; border-color: #2d6a2d; color: #90ee90; }
+    .stage-badge.turn { background: #1a2a3a; border-color: #2d4a6a; color: #90c0ee; }
+    .stage-badge.river { background: #2a1a3a; border-color: #4a2d6a; color: #bb90ee; }
+    .status {
+      margin-top: 10px;
+      font-size: 12px;
+      color: #555;
+      min-height: 18px;
+      font-family: monospace;
+    }
+    .status.highlight { color: #90ee90; }
+    .status.warning { color: #ffd166; }
+    #handList {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      max-height: 340px;
+      overflow-y: auto;
+    }
+    .hand-item {
+      background: #111;
+      border: 1px solid #2a2a2a;
+      border-radius: 7px;
+      padding: 8px 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      cursor: pointer;
+      transition: border-color 0.15s;
+    }
+    .hand-item:hover { border-color: #444; }
+    .hand-item.new   { border-color: #2d6a2d; }
+    .hand-text { font-family: monospace; font-size: 13px; color: #e0e0e0; word-break: break-all; flex: 1; }
+    .hand-text .hero  { color: #ffd166; }
+    .hand-text .board { color: #90ee90; }
+    .hand-text .sep   { color: #555; }
+    .hand-meta { font-size: 11px; color: #444; white-space: nowrap; text-align: right; min-width: 55px; }
+    .empty { color: #444; font-size: 13px; padding: 20px 0; text-align: center; }
+    .feed-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+    .feed-count { font-size: 11px; color: #555; }
+    #handList::-webkit-scrollbar { width: 4px; }
+    #handList::-webkit-scrollbar-track { background: #111; }
+    #handList::-webkit-scrollbar-thumb { background: #333; border-radius: 2px; }
+  </style>
+</head>
+<body>
+
+<h1><span class="dot" id="liveDot"></span> Nuts4Poker Hand Collector — Auto Flow</h1>
+
+<div class="box">
+  <div class="box-title">Current Hand Display (Auto-Trigger Flow)</div>
+  <textarea id="handText" readonly placeholder="Waiting for hole cards..."></textarea>
+  <div class="row">
+    <button class="primary" onclick="copyText()">Copy</button>
+    <button class="danger"  onclick="clearText()">Clear</button>
+    <button class="trigger" id="triggerBtn" onclick="manualTrigger()">Trigger Equity</button>
+    <div class="stage-badge" id="stageBadge">IDLE</div>
+  </div>
+  <div class="status" id="status"></div>
+</div>
+
+<div class="box">
+  <div class="feed-header">
+    <div class="box-title">Saved hands (live)</div>
+    <span class="feed-count" id="feedCount"></span>
+  </div>
+  <div id="handList"><div class="empty">No hands saved yet.</div></div>
+</div>
+
+<script>
+  const BASE = '/api/collector';
+
+  // ── STATE MACHINE ──────────────────────────────────────────
+  let currentStage   = 'IDLE';       // IDLE | PREFLOP | FLOP | TURN | RIVER
+  let currentHero    = '';           // hole cards
+  let currentBoard   = '';           // board cards
+  let lastHandHash   = '';           // to detect new hands
+  let triggerFired   = false;        // prevent double-trigger
+  let knownFiles     = new Set();
+  let firstLoad      = true;
+
+  // ── STAGE DETECTION ────────────────────────────────────────
+  function detectStage(hero, board) {
+    if (!hero) return 'IDLE';
+
+    const boardCards = board.match(/[AKQJT2-9][hdcs]/gi) || [];
+    const cardCount = boardCards.length;
+
+    if (cardCount === 0) return 'PREFLOP';
+    if (cardCount === 3) return 'FLOP';
+    if (cardCount === 4) return 'TURN';
+    if (cardCount === 5) return 'RIVER';
+
+    return 'IDLE';
+  }
+
+  // ── STATE TRANSITIONS ──────────────────────────────────────
+  function updateState(hero, board) {
+    const handHash = hero + '|' + board;
+    const newStage = detectStage(hero, board);
+
+    // Detect new hand (hero cards changed or went from RIVER/IDLE → PREFLOP)
+    if (handHash !== lastHandHash) {
+      const heroChanged = hero !== currentHero;
+      const isNewHand = heroChanged || (currentStage === 'RIVER' && newStage === 'PREFLOP') || (currentStage === 'IDLE' && newStage === 'PREFLOP');
+
+      if (isNewHand) {
+        // New hand detected
+        currentHero = hero;
+        currentBoard = board;
+        currentStage = newStage;
+        triggerFired = false;
+        lastHandHash = handHash;
+
+        // Display hole cards immediately
+        displayHand(hero, board);
+        updateStageBadge();
+        setStatus('New hand — hole cards displayed', 'highlight');
+        return;
+      }
+    }
+
+    // Stage progression within same hand
+    if (newStage !== currentStage) {
+      const oldStage = currentStage;
+      currentStage = newStage;
+      currentHero = hero;
+      currentBoard = board;
+      lastHandHash = handHash;
+
+      if (newStage === 'FLOP' && !triggerFired) {
+        // FLOP DETECTED → AUTO-TRIGGER
+        displayHand(hero, board);
+        updateStageBadge();
+        autoTrigger();
+        triggerFired = true;
+        setStatus('FLOP detected — equity trigger fired ✓', 'highlight');
+      } else if (newStage === 'TURN') {
+        // TURN → Keep displaying
+        displayHand(hero, board);
+        updateStageBadge();
+        setStatus('TURN detected — display maintained', 'highlight');
+      } else if (newStage === 'RIVER') {
+        // RIVER DETECTED → AUTO-CLEAR
+        updateStageBadge();
+        setStatus('RIVER detected — clearing display...', 'warning');
+        setTimeout(() => {
+          autoClear();
+          setStatus('Display cleared — ready for next hand', 'highlight');
+        }, 500);
+      } else {
+        displayHand(hero, board);
+        updateStageBadge();
+        setStatus(`Stage: ${oldStage} → ${newStage}`, 'highlight');
+      }
+    } else {
+      // Same stage, just update display
+      currentHero = hero;
+      currentBoard = board;
+      lastHandHash = handHash;
+      displayHand(hero, board);
+    }
+  }
+
+  // ── DISPLAY ────────────────────────────────────────────────
+  function displayHand(hero, board) {
+    const lines = [];
+
+    if (hero) {
+      // Group hole cards (display all collected hands)
+      lines.push(hero);
+    }
+
+    if (board) {
+      lines.push(board);
+    }
+
+    document.getElementById('handText').value = lines.join('\n');
+  }
+
+  function updateStageBadge() {
+    const badge = document.getElementById('stageBadge');
+    badge.textContent = currentStage;
+    badge.className = 'stage-badge ' + currentStage.toLowerCase();
+  }
+
+  // ── AUTO ACTIONS ───────────────────────────────────────────
+  function autoTrigger() {
+    // This is where you'd call your equity engine
+    // For now, just log and flash the button
+    console.log('[AUTO-TRIGGER] Flop detected, triggering equity calculation');
+    console.log('Hero:', currentHero);
+    console.log('Board:', currentBoard);
+
+    const btn = document.getElementById('triggerBtn');
+    btn.style.background = '#4a3a6a';
+    setTimeout(() => btn.style.background = '', 300);
+
+    // TODO: Call equity engine API here
+    // fetch('/api/equity/run', { method: 'POST', body: JSON.stringify({ hero: currentHero, board: currentBoard }) });
+  }
+
+  function autoClear() {
+    document.getElementById('handText').value = '';
+    currentStage = 'IDLE';
+    currentHero = '';
+    currentBoard = '';
+    triggerFired = false;
+    updateStageBadge();
+  }
+
+  // ── MANUAL CONTROLS ────────────────────────────────────────
+  function copyText() {
+    const text = document.getElementById('handText').value;
+    if (!text.trim()) { setStatus('Nothing to copy'); return; }
+    navigator.clipboard.writeText(text);
+    setStatus('Copied to clipboard ✓', 'highlight');
+  }
+
+  function clearText() {
+    autoClear();
+    setStatus('Manually cleared', 'highlight');
+  }
+
+  function manualTrigger() {
+    if (!currentHero) {
+      setStatus('No hero cards to trigger', 'warning');
+      return;
+    }
+    autoTrigger();
+    setStatus('Manual trigger fired ✓', 'highlight');
+  }
+
+  function setStatus(msg, cls = '') {
+    const el = document.getElementById('status');
+    el.textContent = msg;
+    el.className = 'status ' + cls;
+  }
+
+  // ── LIVE FEED ──────────────────────────────────────────────
+  function formatHand(text) {
+    const parts = text.split('|');
+    if (parts.length === 2) {
+      return '<span class="hero">' + esc(parts[0]) + '</span>'
+           + '<span class="sep"> | </span>'
+           + '<span class="board">' + (esc(parts[1]) || '<em style="color:#444">preflop</em>') + '</span>';
+    }
+    return '<span>' + esc(text) + '</span>';
+  }
+
+  function esc(s) {
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  async function loadHands() {
+    try {
+      const r = await fetch(BASE + '/list');
+      if (!r.ok) return;
+      const data  = await r.json();
+      const hands = data.hands || [];
+
+      document.getElementById('feedCount').textContent =
+        hands.length + ' hand' + (hands.length !== 1 ? 's' : '') + ' total';
+
+      const list = document.getElementById('handList');
+      if (!hands.length) {
+        list.innerHTML = '<div class="empty">No hands saved yet.</div>';
+        knownFiles.clear();
+        return;
+      }
+
+      // Get most recent hand for state machine
+      if (hands.length > 0) {
+        const latest = hands[0];
+        const parts = latest.text.split('|');
+        if (parts.length === 2) {
+          const hero = parts[0].trim();
+          const board = parts[1].trim();
+          updateState(hero, board);
+        }
+      }
+
+      const newFiles = new Set(hands.map(h => h.file));
+      const added    = [...newFiles].filter(f => !knownFiles.has(f));
+
+      list.innerHTML = hands.map(h => {
+        const isNew    = !firstLoad && added.includes(h.file);
+        const safeText = h.text.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+        return '<div class="hand-item' + (isNew ? ' new' : '') + '" onclick="copyHand(this,\'' + safeText + '\')">'
+             + '<div class="hand-text">' + formatHand(h.text) + '</div>'
+             + '<div class="hand-meta">' + h.time + '</div>'
+             + '</div>';
+      }).join('');
+
+      knownFiles = newFiles;
+      firstLoad  = false;
+
+      const dot = document.getElementById('liveDot');
+      if (added.length) {
+        dot.className = 'dot live';
+        setTimeout(() => dot.className = 'dot', 8000);
+      }
+
+    } catch(e) {
+      console.error('loadHands', e);
+    }
+  }
+
+  function copyHand(el, text) {
+    navigator.clipboard.writeText(text).then(() => {
+      const meta = el.querySelector('.hand-meta');
+      const orig = meta.textContent;
+      meta.textContent = 'Copied!';
+      setTimeout(() => meta.textContent = orig, 1200);
+    });
+  }
+
+  // ── INIT ───────────────────────────────────────────────────
+  loadHands();
+  setInterval(loadHands, 2000);
+  setStatus('Waiting for hands...');
+</script>
+</body>
+</html>
