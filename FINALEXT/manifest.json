@@ -1,0 +1,22 @@
+{
+  "manifest_version": 3,
+  "name": "FINALEXT",
+  "version": "4.0",
+  "description": "Injects w4p.js into PokerBet poker tables (CSP-safe, MAIN world)",
+  "permissions": [],
+  "content_scripts": [
+    {
+      "matches": [
+        "*://*.pokerbet.co.za/*",
+        "*://*.goldrushnation.com/*",
+        "*://*.skillgames-bc.com/*",
+        "*://*.skillgames.com/*",
+        "*://*.betconstruct.com/*"
+      ],
+      "js": ["w4p.js"],
+      "run_at": "document_idle",
+      "all_frames": true,
+      "world": "MAIN"
+    }
+  ]
+}
