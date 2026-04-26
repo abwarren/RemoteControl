@@ -1,4 +1,4 @@
-// W4P Injectable v21 - PLO Remote Table Control (hero-only: .self-player class ONLY, no fallbacks)
+// W4P Injectable v22-stable-hardened - PLO Remote Table Control (hero-only: .self-player class ONLY, no fallbacks)
 // v19: remove .active gate — self-player + visible buttons = available_actions
 // v19.1-3: fix MAX flow, diagnostics, getBoundingClientRect consistency
 // v20: unified direct fetch — same file works as extension AND standalone (no bridge.js needed)
@@ -6,7 +6,10 @@
 // v21: Preset-first model — click preset <li>, wait for <i> amount change, THEN click BET/RAISE
 //      No openRaiseSlider. No slider input[range] manipulation. No all-in logic.
 //      Hard rule: never execute BET/RAISE unless <i> amount changed or was already correct.
-// Extension runtime: deployed to Windows Chrome instances via SSM
+// v22: cashout preselect persistence across hand transitions, pre-action persistence, 75ms hyper-poll
+// v22-stable-hardened: guards, cooldowns, duplicate command protection, enhanced logging. No behaviour changes.
+// Extension runtime: deployed to KasmVNC containers via docker cp
+// Rollback: w4p.js.v22-stable.bak in same directory
 // Paste into skillgames iframe console, or: fetch('https://potlimitomaha.xyz/w4p.js').then(r=>r.text()).then(eval)
 // Scrapes ALL seats, sends structured snapshots with button detection, polls commands, clicks buttons
 // No chrome.runtime deps — pure fetch-based
@@ -61,6 +64,13 @@
   var _cashoutPre = false;   // when true, hyper-poll for cashout DOM element
   var _cashoutTimer = null;
   var _lastBoardLen = 0;     // track board cards for new hand detection
+
+  // ── v22-hardened: duplicate command guard + action cooldowns ──
+  var _lastCmdId = null;              // last executed command ID — reject duplicates
+  var _actionCooldowns = {};          // { 'action_name': timestamp } — per-action cooldown
+  var _ACTION_COOLDOWN_MS = 800;      // min ms between same action (prevent double-click)
+  var _PRESET_COOLDOWN_MS = 1500;     // min ms between preset executions (preset→verify→execute cycle)
+  var _cmdCount = 0;                  // total commands processed this session
 
   var RANK_MAP = { 'a':'A', 'k':'K', 'q':'Q', 'j':'J', 't':'T', '10':'T' };
 
@@ -810,7 +820,7 @@
   function presetThenExecute(presetRegex, actionName) {
     var execBtn = findExecuteButton();
     if (!execBtn) {
-      console.log('[W4P][' + actionName + '] ABORT: no BET/RAISE button visible');
+      console.log('[W4P][MISS] ' + actionName + ': no BET/RAISE button visible — REFUSED');
       return;
     }
 
@@ -850,7 +860,7 @@
     }
 
     if (!clicked) {
-      console.log('[W4P][' + actionName + '] ABORT: no matching preset found. NOT executing.');
+      console.log('[W4P][MISS] ' + actionName + ': no matching preset found — REFUSED, no blind click');
       return;
     }
 
@@ -873,12 +883,12 @@
         var btnText = (btn.el.textContent || '').trim().substring(0, 40);
         if (amountAfter === amountBefore && checkCount >= maxChecks) {
           // Amount didn't change — preset click may have failed (isTrusted blocked)
-          console.log('[W4P][' + actionName + '] WARNING: amount unchanged after preset click (' +
+          console.log('[W4P][REFUSE] ' + actionName + ': amount unchanged (' +
             amountBefore + ' → ' + amountAfter + '). Preset "' + clickedText + '" may have been blocked.');
-          console.log('[W4P][' + actionName + '] NOT executing — amount did not change. Manual action required.');
+          console.log('[W4P][REFUSE] ' + actionName + ': NOT executing — no blind click. Manual action required.');
           return;
         }
-        console.log('[W4P][' + actionName + '] amount_before=' + amountBefore + ' amount_after=' + amountAfter +
+        console.log('[W4P][EXEC] ' + actionName + ': amount_before=' + amountBefore + ' amount_after=' + amountAfter +
           ' preset="' + clickedText + '" button="' + btnText + '" — EXECUTING');
         nativeClick(btn.el);
         return;
@@ -979,10 +989,33 @@
     }, 300);
   }
 
+  // ── v22-hardened: cooldown check — returns true if action is on cooldown ──
+  function isOnCooldown(action, cooldownMs) {
+    var now = Date.now();
+    var last = _actionCooldowns[action] || 0;
+    if (now - last < cooldownMs) {
+      console.log('[W4P][GUARD] COOLDOWN: ' + action + ' blocked (' + (now - last) + 'ms < ' + cooldownMs + 'ms)');
+      return true;
+    }
+    return false;
+  }
+  function markCooldown(action) {
+    _actionCooldowns[action] = Date.now();
+  }
+
   // ── Command handler ──────────────────────────────────────────
   function handleCommand(cmd) {
     var action = (cmd.type || cmd.command || '').toLowerCase();
-    console.log('[W4P] CMD:', action, cmd.amount ? 'amt=' + cmd.amount : '');
+    _cmdCount++;
+
+    // ── v22-hardened: duplicate command guard ──
+    if (cmd.id && cmd.id === _lastCmdId) {
+      console.log('[W4P][GUARD] DUPLICATE cmd_id=' + cmd.id + ' action=' + action + ' — IGNORED');
+      return;
+    }
+    if (cmd.id) _lastCmdId = cmd.id;
+
+    console.log('[W4P][CMD-RECV] #' + _cmdCount + ' action=' + action + (cmd.amount ? ' amt=' + cmd.amount : '') + ' id=' + (cmd.id || 'none'));
 
     // ── Pre-actions & buy-in ──
     if (action === 'buyin' || action === 'rebuy_max' || action === 'rebuy_min' || action === 'buyin_max' || action === 'buyin_min') {
@@ -1006,11 +1039,16 @@
       back_to_game:  '.control-b-view-p.back_to_game-c'
     };
     if (DIRECT[action]) {
+      if (isOnCooldown(action, _ACTION_COOLDOWN_MS)) return;
       var btn = document.querySelector(DIRECT[action]);
       var btnR = btn ? btn.getBoundingClientRect() : null;
       if (btn && btnR && btnR.width > 0 && btnR.height > 0) {
-        nativeClick(btn); console.log('[W4P] Clicked native:', action);
-      } else { console.log('[W4P] Button not visible:', action); }
+        nativeClick(btn);
+        markCooldown(action);
+        console.log('[W4P][EXEC] ' + action + ' — clicked ' + DIRECT[action]);
+      } else {
+        console.log('[W4P][MISS] ' + action + ' — selector ' + DIRECT[action] + ' not visible');
+      }
       return;
     }
 
@@ -1018,16 +1056,19 @@
 
     // PLO: no all-in action. Legacy allin → MAX preset
     if (action === 'allin' || action === 'all-in' || action === 'all_in') {
+      if (isOnCooldown('preset', _PRESET_COOLDOWN_MS)) return;
       console.log('[W4P] PLO: allin remapped to MAX preset');
+      markCooldown('preset');
       presetThenExecute(/\bmax\b/i, 'ALLIN→MAX');
       return;
     }
 
     // RAISE / BET — execute only if no custom amount requested, or displayed amount matches
     if (action === 'raise' || action === 'bet') {
+      if (isOnCooldown(action, _ACTION_COOLDOWN_MS)) return;
       var execBtn = findExecuteButton();
       if (!execBtn) {
-        console.log('[W4P] ' + action + ': no visible BET/RAISE button');
+        console.log('[W4P][MISS] ' + action + ': no visible BET/RAISE button — REFUSED');
         return;
       }
       var displayed = readButtonAmount(execBtn.el);
@@ -1035,30 +1076,32 @@
         // Custom amount requested — only execute if displayed amount already matches
         var requested = parseFloat(cmd.amount);
         if (!isNaN(requested) && displayed !== null && Math.abs(displayed - requested) < 0.01) {
-          console.log('[W4P] ' + action + ': displayed=' + displayed + ' matches requested=' + requested + ' — EXECUTING');
+          console.log('[W4P][EXEC] ' + action + ': displayed=' + displayed + ' matches requested=' + requested + ' — EXECUTING');
           nativeClick(execBtn.el);
+          markCooldown(action);
         } else {
-          console.log('[W4P] ' + action + ': BLOCKED — custom amount=' + cmd.amount + ' but displayed=' + displayed + '. Custom slider not yet supported.');
+          console.log('[W4P][REFUSE] ' + action + ': custom amount=' + cmd.amount + ' but displayed=' + displayed + '. BLOCKED — no blind click.');
         }
       } else {
         // No amount: execute at current displayed amount
-        console.log('[W4P] ' + action + ': executing ' + execBtn.type + ' at displayed amount=' + displayed);
+        console.log('[W4P][EXEC] ' + action + ': executing ' + execBtn.type + ' at displayed amount=' + displayed);
         nativeClick(execBtn.el);
+        markCooldown(action);
       }
       return;
     }
 
     // POT: click POT preset → wait → execute
-    if (action === 'pot') { presetThenExecute(/\bpot\b/i, 'POT'); return; }
+    if (action === 'pot') { if (isOnCooldown('preset', _PRESET_COOLDOWN_MS)) return; markCooldown('preset'); presetThenExecute(/\bpot\b/i, 'POT'); return; }
 
     // MAX / RAISE_MAX: click MAX preset → wait → execute
-    if (action === 'max' || action === 'raise_max') { presetThenExecute(/\bmax\b/i, 'MAX'); return; }
+    if (action === 'max' || action === 'raise_max') { if (isOnCooldown('preset', _PRESET_COOLDOWN_MS)) return; markCooldown('preset'); presetThenExecute(/\bmax\b/i, 'MAX'); return; }
 
     // MIN / RAISE_MIN: click MIN preset → wait → execute
-    if (action === 'min' || action === 'raise_min') { presetThenExecute(/\bmin\b/i, 'MIN'); return; }
+    if (action === 'min' || action === 'raise_min') { if (isOnCooldown('preset', _PRESET_COOLDOWN_MS)) return; markCooldown('preset'); presetThenExecute(/\bmin\b/i, 'MIN'); return; }
 
     // HALF / 1/2 / 32%: click percentage preset → wait → execute
-    if (action === 'half' || action === '1/2') { presetThenExecute(/1\/2|half|32/i, 'HALF'); return; }
+    if (action === 'half' || action === '1/2') { if (isOnCooldown('preset', _PRESET_COOLDOWN_MS)) return; markCooldown('preset'); presetThenExecute(/1\/2|half|32/i, 'HALF'); return; }
 
     // CLICK: direct selector click (used by remote with detected selectors)
     if (action === 'click' && cmd.selector) {
@@ -1073,7 +1116,7 @@
       return;
     }
 
-    console.log('[W4P] Unknown command:', action);
+    console.log('[W4P][REFUSE] unknown command: "' + action + '" — no handler, IGNORED');
   }
 
   // clickPresetAndConfirm — REMOVED in v21. Replaced by presetThenExecute().
@@ -1085,12 +1128,18 @@
 
   function runPreAction(avail) {
     if (!_preAction) return;
+    var executed = false;
     if (_preAction === 'check_fold') {
-      if (avail.indexOf('check') !== -1) clickAction('check');
-      else if (avail.indexOf('fold') !== -1) clickAction('fold');
+      if (avail.indexOf('check') !== -1) { clickAction('check'); executed = true; }
+      else if (avail.indexOf('fold') !== -1) { clickAction('fold'); executed = true; }
     } else if (_preAction === 'check_call') {
-      if (avail.indexOf('check') !== -1) clickAction('check');
-      else if (avail.indexOf('call') !== -1) clickAction('call');
+      if (avail.indexOf('check') !== -1) { clickAction('check'); executed = true; }
+      else if (avail.indexOf('call') !== -1) { clickAction('call'); executed = true; }
+    }
+    if (executed) {
+      console.log('[W4P][EXEC] pre-action ' + _preAction + ' — executed, clearing');
+    } else {
+      console.log('[W4P][MISS] pre-action ' + _preAction + ' — no matching button in avail=[' + avail.join(',') + '], clearing anyway');
     }
     _preAction = null;
   }
@@ -1138,10 +1187,13 @@
   function tryCashout() {
     if (!_cashoutPre) return;
     var btn = document.querySelector('.control-b-view-p.cash_out-c');
-    if (btn && (btn.offsetParent !== null || btn.offsetWidth > 0)) {
+    var coR = btn ? btn.getBoundingClientRect() : null;
+    if (btn && coR && coR.width > 0 && coR.height > 0) {
+      if (isOnCooldown('cashout', _ACTION_COOLDOWN_MS)) return;
       nativeClick(btn);
+      markCooldown('cashout');
       _cashoutPre = false;
-      console.log('[W4P] CASHOUT executed via preselect');
+      console.log('[W4P][EXEC] CASHOUT via preselect — .cash_out-c clicked, _cashoutPre cleared');
     }
   }
 
@@ -1213,9 +1265,14 @@
   untickWaitBB();
   window._w4p_bbTimer = setInterval(untickWaitBB, 5000);
 
-  console.log('[W4P] v22 preset-first-execute + cashout-pre + pre-actions | session=' + _sessionId);
-  console.log('[W4P] Polling: hero=' + POLL_MS.HERO_TURN + 'ms cmd=' + CMD_MS.HERO_TURN + 'ms');
-  console.log('[W4P] API: ' + API_BASE + ' | Remote: potlimitomaha.xyz/remote');
+  var _buildTag = 'v22-stable-hardened';
+  var _buildTs  = '2026-04-26T02:30:00Z';
+  console.log('[W4P] ═══════════════════════════════════════════════');
+  console.log('[W4P] ' + _buildTag + ' | built=' + _buildTs + ' | session=' + _sessionId);
+  console.log('[W4P] guards: dup-cmd, cooldown=' + _ACTION_COOLDOWN_MS + 'ms, preset-cd=' + _PRESET_COOLDOWN_MS + 'ms');
+  console.log('[W4P] polling: hero=' + POLL_MS.HERO_TURN + 'ms cmd=' + CMD_MS.HERO_TURN + 'ms cashout-hyper=' + CASHOUT_POLL_MS + 'ms');
+  console.log('[W4P] API: ' + API_BASE + ' | rollback: w4p.js.v22-stable.bak');
+  console.log('[W4P] ═══════════════════════════════════════════════');
   tick();
 
   // ── Public API for debugging ─────────────────────────────────
