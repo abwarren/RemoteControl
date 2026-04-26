@@ -1,0 +1,30 @@
+Content-Type: text/x-zim-wiki
+Wiki-Format: zim 0.6
+Creation-Date: 2026-04-23T19:44:18+02:00
+
+====== me ======
+Created Thursday 23 April 2026
+
+  (function(){var t=function(e){return e?(e.textContent||'').trim():''};console.log('=== DISCOVER
+  ===');var g=document.querySelectorAll('[data-game-id]');console.log('game-ids:',g.length);var
+  m=document.querySelectorAll('[data-market-type],[data-market-id]');console.log('markets:',m.length)
+  ;for(var i=0;i<Math.min(m.length,5);i++)console.log('
+  ',m[i].tagName,m[i].getAttribute('data-market-type'),m[i].className.substring(0,80));var
+  e=document.querySelectorAll('[data-event-id]');console.log('event-ids:',e.length);for(var
+  i=0;i<Math.min(e.length,5);i++)console.log('
+  ',e[i].tagName,t(e[i]).substring(0,40),e[i].className.substring(0,60));var
+  bc=document.querySelectorAll('[class*="-bc"]');var c={};for(var
+  i=0;i<Math.min(bc.length,500);i++)bc[i].className.split(/\s+/).filter(function(x){return
+  x.indexOf('-bc')!==-1}).forEach(function(x){c[x]=(c[x]||0)+1});var
+  top=Object.entries(c).sort(function(a,b){return b[1]-a[1]}).slice(0,20);console.log('Top -bc
+  classes:');top.forEach(function(p){console.log(' '+p[1]+'x '+p[0])});var
+  all=document.querySelectorAll('*');for(var j=0;j<all.length;j++){var x=t(all[j]).toLowerCase();if((
+  x==='over'||x==='under')&&all[j].children.length===0)console.log('O/U: <'+all[j].tagName+'
+  class="'+all[j].className.substring(0,60)+'">
+  parent="'+(all[j].parentElement?all[j].parentElement.className.substring(0,60):'')+'"}')};var
+  o=document.querySelectorAll('[class*="odd"],[class*="coefficient"]');console.log('Odds
+  elements:',o.length);for(var i=0;i<Math.min(o.length,8);i++)console.log(' <'+o[i].tagName+'
+  class="'+o[i].className.substring(0,80)+'"> "'+t(o[i]).substring(0,30)+'"');console.log('=== DONE
+  ===')})()
+ `	1		`1	-+
+ cvbn;/."++
