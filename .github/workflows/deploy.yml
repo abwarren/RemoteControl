@@ -1,0 +1,39 @@
+name: Deploy to Dublin
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'frontend/**'
+      - 'backend/**'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DUBLIN_SSH_KEY }}" > ~/.ssh/ploxyz.pem
+          chmod 600 ~/.ssh/ploxyz.pem
+          ssh-keyscan -H 52.16.14.220 >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Deploy frontend
+        if: contains(github.event.head_commit.modified, 'frontend/')
+        run: |
+          scp -i ~/.ssh/ploxyz.pem frontend/remote-w4p.html ubuntu@52.16.14.220:/opt/plo-engine/static/remote-w4p.html
+          scp -i ~/.ssh/ploxyz.pem frontend/remote-w4p.html ubuntu@52.16.14.220:/opt/plo-w4p/static/remote-w4p.html
+          scp -i ~/.ssh/ploxyz.pem frontend/remote-w4p.html ubuntu@52.16.14.220:/opt/plo-equity/static/remote-w4p.html
+
+      - name: Deploy backend
+        if: contains(github.event.head_commit.modified, 'backend/')
+        run: |
+          scp -i ~/.ssh/ploxyz.pem backend/app.py ubuntu@52.16.14.220:/opt/plo-w4p/app.py
+          ssh -i ~/.ssh/ploxyz.pem ubuntu@52.16.14.220 "sudo systemctl restart plo-w4p"
+
+      - name: Verify
+        run: |
+          sleep 3
+          ssh -i ~/.ssh/ploxyz.pem ubuntu@52.16.14.220 "curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:5003/remote"
