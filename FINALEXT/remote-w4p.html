@@ -155,37 +155,40 @@
   .seat-slot {
     position: relative;
     width: 100%;
-    min-height: 120px;
+  }
+  .seat-slot.empty-slot {
+    display: none;
   }
 
   /* -- Seat box -- */
   .seat-box {
     width: 100%;
+    height: 240px;
     background: rgba(13, 17, 23, 0.92);
     border: 2px solid rgba(255,255,255,0.1);
     border-radius: 10px;
     padding: 10px 12px;
     text-align: center;
-    transition: border-color 0.15s, opacity 0.15s;
+    transition: border-color 0.08s;
     box-shadow: 0 4px 12px rgba(0,0,0,0.5);
     position: relative;
+    contain: layout style;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
   }
   .seat-box.empty {
     opacity: 0.3;
     border-style: dashed;
     border-color: rgba(255,255,255,0.12);
     background: rgba(13,17,23,0.4);
-    min-height: 80px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
+    height: 240px;
   }
   .seat-box.hero {
     border-color: #1976d2;
     box-shadow: 0 0 12px rgba(25,118,210,0.4), 0 4px 12px rgba(0,0,0,0.5);
   }
-  .seat-box.expanded {
+  .seat-box.active-turn {
     border-color: #ffd54f;
     box-shadow: 0 0 6px rgba(255,213,79,0.3), 0 2px 6px rgba(0,0,0,0.4);
   }
@@ -216,7 +219,7 @@
   .seat-label { font-size: 0.65em; color: #555; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 2px; }
   .seat-name { font-size: 0.95em; font-weight: 700; color: #e0e0e0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin: 0 auto; }
   .seat-box.hero .seat-name { color: #64b5f6; }
-  .seat-box.expanded .seat-name { color: #ffd54f; }
+  .seat-box.active-turn .seat-name { color: #ffd54f; }
   .seat-stack { font-size: 0.8em; color: #aaa; margin-top: 2px; }
   .seat-stack .amount { color: #4caf50; font-weight: 600; }
   .seat-cards-area { display: flex; justify-content: center; margin-top: 4px; }
@@ -288,23 +291,42 @@
   .sc-toggle.active { background: rgba(76,175,80,0.25); border-color: #4caf50; color: #4caf50; }
   .sc-toggle.co-toggle.active { background: rgba(244,67,54,0.25); border-color: #f44336; color: #f44336; }
   .sc-toggle.autocc-toggle.active { background: rgba(255,193,7,0.25); border-color: #ffc107; color: #ffc107; }
-  .global-autocc-bar { display:flex; align-items:center; gap:8px; padding:4px 12px; background:#1a1a2e; border-bottom:1px solid #333; }
-  .global-autocc-btn { padding:3px 10px; border:1px solid #555; border-radius:4px; background:transparent; color:#888; font-size:11px; font-weight:700; cursor:pointer; }
-  .global-autocc-btn.active { background:rgba(255,193,7,0.25); border-color:#ffc107; color:#ffc107; }
-  .global-autocc-btn.active-cf { background:rgba(76,175,80,0.25); border-color:#4caf50; color:#4caf50; }
-  .global-autocc-btn.active-kh { background:rgba(233,30,99,0.25); border-color:#e91e63; color:#e91e63; }
+  .global-cmd-bar { display:flex; align-items:center; gap:6px; padding:6px 12px; background:#1a1a2e; border-bottom:1px solid #333; flex-wrap:wrap; }
+  .gcmd { padding:4px 10px; border:1px solid #555; border-radius:4px; background:transparent; color:#888; font-size:10px; font-weight:700; cursor:pointer; letter-spacing:0.3px; transition:background 0.06s, border-color 0.06s; user-select:none; }
+  .gcmd:hover { border-color:#aaa; color:#ccc; }
+  .gcmd:active { transform:scale(0.95); }
+  .gcmd.active { background:rgba(255,193,7,0.25); border-color:#ffc107; color:#ffc107; }
+  .gcmd.active-cf { background:rgba(76,175,80,0.25); border-color:#4caf50; color:#4caf50; }
+  .gcmd.active-kh { background:rgba(233,30,99,0.25); border-color:#e91e63; color:#e91e63; }
+  .gcmd.buyin { border-color:#ff9800; color:#ff9800; }
+  .gcmd.buyin:hover { background:rgba(255,152,0,0.2); }
+  .gcmd.fold { border-color:#b82030; color:#e74c3c; }
+  .gcmd.fold:hover { background:rgba(184,32,48,0.2); }
+  .gcmd.sitout { border-color:#9c27b0; color:#ba68c8; }
+  .gcmd.sitout:hover { background:rgba(156,39,176,0.2); }
+  .gcmd-sep { width:1px; height:20px; background:#333; margin:0 2px; }
   .kh-toggle { border-color:#e91e63 !important; }
   .kh-toggle.active { background:rgba(233,30,99,0.3) !important; border-color:#e91e63 !important; color:#e91e63 !important; }
   .seat-box.kh-marked { border-color:#4caf50 !important; box-shadow: 0 0 12px rgba(76,175,80,0.5), 0 4px 12px rgba(0,0,0,0.5) !important; }
+  .seat-box.kh-marked.kh-live { animation: kh-pulse 1s infinite; }
+  @keyframes kh-pulse {
+    0%, 100% { box-shadow: 0 0 12px rgba(76,175,80,0.5), 0 4px 12px rgba(0,0,0,0.5); }
+    50% { box-shadow: 0 0 24px rgba(76,175,80,0.9), 0 0 40px rgba(76,175,80,0.3); }
+  }
   .seat-box.kh-auto { border-color:#ff9800 !important; box-shadow: 0 0 8px rgba(255,152,0,0.4), 0 4px 12px rgba(0,0,0,0.5) !important; }
   .kh-badge { font-size:0.6em; font-weight:700; padding:1px 5px; border-radius:3px; margin-left:4px; background:rgba(233,30,99,0.3); color:#e91e63; }
+  .kh-manual-badge { font-size:0.6em; font-weight:800; padding:2px 6px; border-radius:3px; margin-left:4px; background:rgba(76,175,80,0.4); color:#4caf50; letter-spacing:0.5px; }
   .autocc-badge { display:inline-block; background:rgba(255,193,7,0.2); color:#ffc107; font-size:7px; font-weight:800; padding:1px 4px; border-radius:2px; margin-left:3px; vertical-align:middle; }
 
-  /* Expanded action area: full buttons + sizing */
+  /* Action area: always present on hero seats */
   .seat-actions {
     margin-top: 3px;
     padding-top: 3px;
     border-top: 1px solid rgba(255,213,79,0.2);
+  }
+  .seat-actions.inactive {
+    opacity: 0.35;
+    border-top-color: rgba(255,255,255,0.05);
   }
   .sa-turn-label {
     font-size: 0.55em;
@@ -325,23 +347,25 @@
   .sa-btn {
     flex: 1;
     min-width: 0;
-    height: 22px;
+    height: 26px;
     border: none;
     border-radius: 4px;
-    font-size: 0.7em;
+    font-size: 0.75em;
     font-weight: 800;
     cursor: pointer;
     color: #fff;
-    transition: all 0.1s;
+    transition: filter 0.06s, transform 0.03s;
     display: flex;
     align-items: center;
     justify-content: center;
     letter-spacing: 0.3px;
-    padding: 0 4px;
+    padding: 0 6px;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
   }
   .sa-btn:disabled { opacity: 0.2; cursor: default; }
   .sa-btn:not(:disabled):hover { filter: brightness(1.2); }
-  .sa-btn:not(:disabled):active { transform: scale(0.95); }
+  .sa-btn:not(:disabled):active { transform: scale(0.92); transition: transform 0.03s; }
 
   .sa-btn.fold    { background: #b82030; }
   .sa-btn.check   { background: #2d6a4f; }
@@ -423,6 +447,114 @@
     background: #1a9a6c;
   }
   .sa-raise-go:hover { filter: brightness(1.2); }
+
+  /* Buy-in button */
+  .sa-buyin {
+    width: 100%;
+    height: 22px;
+    margin-top: 4px;
+    border: 1px solid #ff9800;
+    border-radius: 4px;
+    font-size: 0.65em;
+    font-weight: 800;
+    cursor: pointer;
+    color: #ff9800;
+    background: rgba(255,152,0,0.1);
+    letter-spacing: 0.5px;
+    transition: background 0.06s, transform 0.03s;
+    user-select: none;
+  }
+  .sa-buyin:hover { background: rgba(255,152,0,0.25); }
+  .sa-buyin:active { transform: scale(0.95); background: rgba(255,152,0,0.4); }
+
+  /* Buy-in dialog (mirrors PokerBet sg-buy-in-modal) */
+  .buyin-overlay {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.7);
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .buyin-modal {
+    background: #1a1e28;
+    border: 2px solid #ff9800;
+    border-radius: 12px;
+    padding: 20px;
+    width: 320px;
+    box-shadow: 0 8px 40px rgba(255,152,0,0.3);
+  }
+  .buyin-modal h3 {
+    font-size: 14px;
+    font-weight: 800;
+    color: #ff9800;
+    text-align: center;
+    margin-bottom: 12px;
+    letter-spacing: 1px;
+  }
+  .buyin-modal .buyin-player {
+    font-size: 11px;
+    color: #8b949e;
+    text-align: center;
+    margin-bottom: 16px;
+  }
+  .buyin-modal .buyin-player b { color: #e0e0e0; }
+  .buyin-presets {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+  .buyin-presets button {
+    flex: 1;
+    height: 36px;
+    border: 1px solid #444;
+    border-radius: 6px;
+    background: #2c3040;
+    color: #e0e0e0;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.08s;
+  }
+  .buyin-presets button:hover { background: #ff9800; border-color: #ff9800; color: #000; }
+  .buyin-amount-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 16px;
+  }
+  .buyin-amount-row input {
+    flex: 1;
+    height: 32px;
+    background: #0d1117;
+    border: 1px solid #444;
+    border-radius: 6px;
+    color: #ff9800;
+    font-size: 14px;
+    font-weight: 700;
+    text-align: center;
+    padding: 0 8px;
+  }
+  .buyin-amount-row input:focus { border-color: #ff9800; outline: none; }
+  .buyin-actions {
+    display: flex;
+    gap: 8px;
+  }
+  .buyin-actions button {
+    flex: 1;
+    height: 36px;
+    border: none;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 800;
+    cursor: pointer;
+    transition: filter 0.06s;
+  }
+  .buyin-actions .buyin-confirm { background: #ff9800; color: #000; }
+  .buyin-actions .buyin-confirm:hover { filter: brightness(1.2); }
+  .buyin-actions .buyin-cancel { background: #333; color: #888; }
+  .buyin-actions .buyin-cancel:hover { background: #444; color: #ccc; }
 
   /* ================================================================
      EMERGENCY FALLBACK PANEL (collapsed by default)
@@ -533,10 +665,18 @@
   </div>
 </header>
 
-<div class="global-autocc-bar">
-  <button class="global-autocc-btn" id="global-autocc-btn" onclick="toggleGlobalAutoCC()">AUTO C/C PREFLOP — ALL</button>
-  <button class="global-autocc-btn" id="global-cf-btn" onclick="toggleGlobalAutoCF()" style="border-color:#4caf50;">SELECT ALL AUTO C/F</button>
-  <button class="global-autocc-btn" id="execute-kh-btn" onclick="executeKH()" style="border-color:#e91e63;">EXECUTE KH</button>
+<div class="global-cmd-bar">
+  <button class="gcmd" id="global-cc-preflop-btn" onclick="toggleCCPreflop()" style="border-color:#1e88e5;">C/C ALL PREFLOP</button>
+  <div class="gcmd-sep"></div>
+  <button class="gcmd" id="global-cf-btn" onclick="toggleGlobalAutoCF()" style="border-color:#4caf50;">C/F ALL</button>
+  <button class="gcmd" id="execute-kh-btn" onclick="executeKH()" style="border-color:#e91e63;">KH EXECUTE</button>
+  <button class="gcmd fold" onclick="globalFoldAll()">FOLD ALL</button>
+  <div class="gcmd-sep"></div>
+  <button class="gcmd buyin" onclick="globalBuyinAll()">BUY IN ALL</button>
+  <button class="gcmd sitout" onclick="globalSitOutAll()">SIT OUT ALL</button>
+  <button class="gcmd sitout" onclick="globalResumeAll()">RESUME ALL</button>
+  <div class="gcmd-sep"></div>
+  <button class="gcmd" onclick="togglePlayersPanel()" style="border-color:#58a6ff; color:#58a6ff;">GET SEATED</button>
 </div>
 
 <div class="main-area">
@@ -558,6 +698,27 @@
   <div id="emg-content"></div>
 </div>
 
+<!-- PLAYERS & TABLES PANEL -->
+<div id="players-panel" style="display:none; background:#0d1117; border-top:2px solid #ff9800; padding:12px 16px; max-height:300px; overflow-y:auto;">
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+    <span style="font-size:12px; font-weight:700; color:#ff9800; letter-spacing:1px;">PLAYERS & TABLES</span>
+    <button onclick="document.getElementById('players-panel').style.display='none'" style="background:none; border:1px solid #555; color:#888; border-radius:4px; padding:2px 8px; cursor:pointer; font-size:10px;">CLOSE</button>
+  </div>
+  <div id="players-list" style="margin-bottom:12px;"></div>
+  <div id="tables-list" style="margin-bottom:12px;"></div>
+  <div style="border-top:1px solid #333; padding-top:10px;">
+    <span style="font-size:10px; color:#888; font-weight:700;">ADD PLAYER</span>
+    <div style="display:flex; gap:6px; margin-top:6px; flex-wrap:wrap;">
+      <input id="ap-user" placeholder="Username" style="flex:1; min-width:80px; height:28px; background:#1a1e28; border:1px solid #444; border-radius:4px; color:#e0e0e0; padding:0 8px; font-size:11px;">
+      <input id="ap-pass" placeholder="Password" type="password" style="flex:1; min-width:80px; height:28px; background:#1a1e28; border:1px solid #444; border-radius:4px; color:#e0e0e0; padding:0 8px; font-size:11px;">
+      <input id="ap-container" placeholder="Container (bot-xxx)" style="flex:1; min-width:100px; height:28px; background:#1a1e28; border:1px solid #444; border-radius:4px; color:#e0e0e0; padding:0 8px; font-size:11px;">
+      <input id="ap-eip" placeholder="EIP" style="width:120px; height:28px; background:#1a1e28; border:1px solid #444; border-radius:4px; color:#e0e0e0; padding:0 8px; font-size:11px;">
+      <button onclick="addPlayerSubmit()" style="height:28px; padding:0 12px; background:#ff9800; border:none; border-radius:4px; color:#000; font-weight:800; font-size:11px; cursor:pointer;">ADD</button>
+    </div>
+    <div id="ap-msg" style="font-size:10px; margin-top:4px; color:#4caf50;"></div>
+  </div>
+</div>
+
 <div id="cmd-log"></div>
 
 <script>
@@ -565,8 +726,8 @@
 
 var API = '/api';
 var VERSION = 'remote-ui-grid-v1';
-var POLL_ACTIVE_MS = 250;
-var POLL_IDLE_MS = 750;
+var POLL_ACTIVE_MS = 150;
+var POLL_IDLE_MS = 500;
 
 var SUIT_MAP = {
   h: { sym: '\u2665', cls: 'hearts' },
@@ -583,14 +744,21 @@ var globalAutoCcPreflop = false; // global AUTO C/C PREFLOP — persists across 
 var globalAutoCF = false;        // master SELECT ALL AUTO C/F — new players default to C/F when on
 var globalCFExcluded = {};       // seats manually unticked while globalAutoCF is on
 var khState = {};                // seatNo -> true (KH = Keep Hand, manual input required)
+var khExecuted = false;          // true after KH EXECUTE pressed — shows MANUAL badge on KH seats
+var khRaiseWar = false;          // true when KH+CO: 2 KH seats auto-raise each other
+var khRaiseSeats = [];           // the 2 seat numbers in raise war
+var khCOSeat = null;             // the seat with CO — cashouts after winning
 var autoCcLastSent = {};         // seatNo -> timestamp (throttle re-sends to every 3s)
 var lastBoardKey = null;
+var lastStreet = null;           // track street transitions to clear stale pre-actions
+var lastHoleHash = null;         // detect new hand by hole cards changing
 
 // Per-seat raise amounts
 var seatAmounts = {};      // seatNo -> current amount
 
 // Diff rendering state
-var renderedSeats = {};    // position (0-8) -> hash string
+var renderedSeats = {};
+var lastSeatsHash = null;  // combined hash for occupied seats (skip empty gaps)
 var lastBoardHash = null;
 var slotsCreated = false;
 
@@ -694,9 +862,8 @@ function fetchTable() {
       } else {
         dot.className = 'conn-dot';
         label.textContent = 'no table';
-        if (!lastTable) { schedulePoll(); return; }
-        _lastTableJSON = '';
-        lastTable = null;
+        // Keep last known state — never blank the UI on empty poll
+        schedulePoll(); return;
       }
       scheduleRender();
       schedulePoll();
@@ -705,8 +872,7 @@ function fetchTable() {
       fetchInFlight = false;
       dot.className = 'conn-dot err';
       label.textContent = 'error';
-      lastTable = null;
-      scheduleRender();
+      // Keep last known state — never blank on network error
       schedulePoll();
     });
 }
@@ -824,8 +990,8 @@ function buildSeatBoxHtml(seat) {
 
   var cls = 'seat-box';
   if (isHero) cls += ' hero';
-  if (isActive) cls += ' expanded';
-  if (khState[sn]) cls += ' kh-marked';
+  if (isActive) cls += ' active-turn';
+  if (khState[sn]) { cls += ' kh-marked'; if (khExecuted) cls += ' kh-live'; }
   else if (isHero && preActionState[sn] === 'check_fold') cls += ' kh-auto';
 
   var html = '<div class="' + cls + '">';
@@ -869,11 +1035,14 @@ function buildSeatBoxHtml(seat) {
     if (autoCcActive) html += '<span class="autocc-badge">AUTO C/C</span>';
     html += '<span class="sc-toggle kh-toggle' + (khState[sn] ? ' active' : '') +
       '" data-sc-preact="kh" data-sc-seat="' + sn + '">KH</span>';
-    if (khState[sn]) html += '<span class="kh-badge">KEEP</span>';
+    if (khState[sn]) {
+      html += '<span class="kh-badge">KEEP</span>';
+      if (khExecuted) html += '<span class="kh-manual-badge">MANUAL</span>';
+    }
     html += '</div>';
 
-    // Expanded: full action set when hero is current actor
-    if (isActive) {
+    // Always render action buttons for hero seats (disabled when not active)
+    {
       var btns = seat.buttons || null;
       var slider = btns && btns.slider ? btns.slider : null;
       var hasRaise = acts.indexOf('raise') >= 0;
@@ -887,54 +1056,58 @@ function buildSeatBoxHtml(seat) {
       if (sCur < sMin) sCur = sMin;
       if (sCur > sMax) sCur = sMax;
 
-      html += '<div class="seat-actions">';
-      html += '<div class="sa-turn-label">YOUR TURN</div>';
+      html += '<div class="seat-actions' + (isActive ? '' : ' inactive') + '">';
+      if (isActive) html += '<div class="sa-turn-label">YOUR TURN</div>';
 
       // Row 1: FOLD, CHECK, CALL, BET/RAISE
       html += '<div class="sa-row">';
-      var foldAvail = acts.indexOf('fold') >= 0;
+      var foldAvail = isActive && acts.indexOf('fold') >= 0;
       html += '<button class="sa-btn fold" data-sa-cmd="fold" data-sa-seat="' + sn + '"' + (foldAvail ? '' : ' disabled') + '>FOLD</button>';
-      var checkAvail = acts.indexOf('check') >= 0;
+      var checkAvail = isActive && acts.indexOf('check') >= 0;
       html += '<button class="sa-btn check" data-sa-cmd="check" data-sa-seat="' + sn + '"' + (checkAvail ? '' : ' disabled') + '>CHECK</button>';
-      var callAvail = acts.indexOf('call') >= 0;
+      var callAvail = isActive && acts.indexOf('call') >= 0;
       var callData = getActionData(seat, 'call');
       var callLabel = callData && callData.amount != null ? 'CALL R' + callData.amount : 'CALL';
       html += '<button class="sa-btn call" data-sa-cmd="call" data-sa-seat="' + sn + '"' + (callAvail ? '' : ' disabled') + '>' + callLabel + '</button>';
-      var brAvail = hasRaise || hasBet;
+      var brAvail = isActive && (hasRaise || hasBet);
       html += '<button class="sa-btn ' + raiseWord + '" data-sa-cmd="' + raiseWord + '" data-sa-seat="' + sn + '" data-sa-use-amount="1"' + (brAvail ? '' : ' disabled') + '>' + raiseWord.toUpperCase() + '</button>';
       html += '</div>';
 
-      // Misc actions (cashout, show, run_it_twice, resume_hand, back_to_game)
-      var miscActions = ['cashout', 'show', 'run_it_twice', 'resume_hand', 'back_to_game'];
-      var hasMisc = false;
-      for (var mi = 0; mi < miscActions.length; mi++) {
-        if (acts.indexOf(miscActions[mi]) >= 0) { hasMisc = true; break; }
-      }
-      if (hasMisc) {
-        html += '<div class="sa-row">';
-        miscActions.forEach(function(a) {
-          if (acts.indexOf(a) >= 0) {
-            var label = a.replace(/_/g, ' ').toUpperCase();
-            html += '<button class="sa-btn misc" data-sa-cmd="' + a + '" data-sa-seat="' + sn + '">' + label + '</button>';
-          }
-        });
-        html += '</div>';
-      }
-
-      // Presets
+      // Presets + Slider (always rendered)
       html += '<div class="sa-presets">';
-      html += '<button class="sa-preset" data-sa-preset="min" data-sa-seat="' + sn + '">MIN</button>';
-      html += '<button class="sa-preset" data-sa-preset="half" data-sa-seat="' + sn + '">1/2</button>';
-      html += '<button class="sa-preset" data-sa-preset="pot" data-sa-seat="' + sn + '">POT</button>';
-      html += '<button class="sa-preset" data-sa-preset="max" data-sa-seat="' + sn + '">MAX</button>';
+      html += '<button class="sa-preset" data-sa-preset="min" data-sa-seat="' + sn + '"' + (brAvail ? '' : ' disabled') + '>MIN</button>';
+      html += '<button class="sa-preset" data-sa-preset="half" data-sa-seat="' + sn + '"' + (brAvail ? '' : ' disabled') + '>1/2</button>';
+      html += '<button class="sa-preset" data-sa-preset="pot" data-sa-seat="' + sn + '"' + (brAvail ? '' : ' disabled') + '>POT</button>';
+      html += '<button class="sa-preset" data-sa-preset="max" data-sa-seat="' + sn + '"' + (brAvail ? '' : ' disabled') + '>MAX</button>';
       html += '</div>';
 
-      // Slider + amount + raise-go
       html += '<div class="sa-sizing">';
-      html += '<input type="range" class="sa-slider" data-sa-slider="' + sn + '" min="' + sMin + '" max="' + sMax + '" step="' + sStep + '" value="' + sCur + '">';
-      html += '<input type="number" class="sa-amount" data-sa-amount="' + sn + '" min="' + sMin + '" max="' + sMax + '" value="' + sCur + '">';
-      html += '<button class="sa-raise-go" data-sa-cmd="' + raiseWord + '" data-sa-seat="' + sn + '" data-sa-use-amount="1">' + raiseWord.toUpperCase() + '</button>';
+      html += '<input type="range" class="sa-slider" data-sa-slider="' + sn + '" min="' + sMin + '" max="' + sMax + '" step="' + sStep + '" value="' + sCur + '"' + (brAvail ? '' : ' disabled') + '>';
+      html += '<input type="number" class="sa-amount" data-sa-amount="' + sn + '" min="' + sMin + '" max="' + sMax + '" value="' + sCur + '"' + (brAvail ? '' : ' disabled') + '>';
+      html += '<button class="sa-raise-go" data-sa-cmd="' + raiseWord + '" data-sa-seat="' + sn + '" data-sa-use-amount="1"' + (brAvail ? '' : ' disabled') + '>' + raiseWord.toUpperCase() + '</button>';
       html += '</div>';
+
+      // Misc actions only when available
+      if (isActive) {
+        var miscActions = ['cashout', 'show', 'run_it_twice', 'resume_hand', 'back_to_game'];
+        var hasMisc = false;
+        for (var mi = 0; mi < miscActions.length; mi++) {
+          if (acts.indexOf(miscActions[mi]) >= 0) { hasMisc = true; break; }
+        }
+        if (hasMisc) {
+          html += '<div class="sa-row">';
+          miscActions.forEach(function(a) {
+            if (acts.indexOf(a) >= 0) {
+              var label = a.replace(/_/g, ' ').toUpperCase();
+              html += '<button class="sa-btn misc" data-sa-cmd="' + a + '" data-sa-seat="' + sn + '">' + label + '</button>';
+            }
+          });
+          html += '</div>';
+        }
+      }
+
+      // Buy-in button — opens dialog matching PokerBet sg-buy-in-modal
+      html += '<button class="sa-buyin" data-buyin-seat="' + sn + '">BUY IN</button>';
 
       html += '</div>'; // .seat-actions
     }
@@ -948,51 +1121,42 @@ function buildSeatBoxHtml(seat) {
 
 function renderSeats() {
   var container = document.getElementById('seats-container');
+  if (!container) return;
 
-  if (!slotsCreated) {
-    if (!container) return;  // DOM not ready yet
-    for (var i = 0; i < 9; i++) {
-      var slot = document.createElement('div');
-      slot.className = 'seat-slot';
-      slot.dataset.pos = i;
-      container.appendChild(slot);
-      seatSlots[i] = slot;  // cache DOM ref
-    }
-    slotsCreated = true;
-  }
-
-  var posSeatMap = {};
-  heroIsActive = false;  // recalculate each render
+  // Collect occupied seats in seat_no order
+  var occupiedSeats = [];
+  heroIsActive = false;
   if (lastTable && Array.isArray(lastTable.seats)) {
     lastTable.seats.forEach(function(seat) {
-      if (seat.name != null && seat.status !== "sitting_out") {
-        var rawPos = seat.seat_index != null ? seat.seat_index : seat.seat_no;
-        var pos = rawPos >= 1 ? rawPos - 1 : rawPos;  // map 1-9 → 0-8
-        if (pos != null && pos >= 0 && pos < 9) posSeatMap[pos] = seat;
+      if (seat.name != null && seat.name !== 'Empty' && seat.status !== "sitting_out") {
+        occupiedSeats.push(seat);
       }
-      // detect if any hero has pending actions (drives adaptive poll rate)
       if (seat.is_self_player && seat.available_actions && seat.available_actions.length > 0) {
         heroIsActive = true;
       }
     });
   }
 
-  for (var pos = 0; pos < 9; pos++) {
-    var seat = posSeatMap[pos];
-    var hash = seat ? seatHash(seat) : 'empty';
-    if (renderedSeats[pos] === hash) continue;
+  // Sort by seat_no for consistent order
+  occupiedSeats.sort(function(a, b) {
+    var sa = a.seat_no != null ? a.seat_no : a.seat_index;
+    var sb = b.seat_no != null ? b.seat_no : b.seat_index;
+    return sa - sb;
+  });
 
-    var slot = seatSlots[pos];  // use cached ref
-    if (!slot) continue;  // guard: skip if DOM not ready
-    if (seat) {
-      slot.style.display = '';
-      slot.innerHTML = buildSeatBoxHtml(seat);
-    } else {
-      slot.style.display = 'none';
-      slot.innerHTML = '';
-    }
-    renderedSeats[pos] = hash;
-  }
+  // Build hash of current state to detect changes
+  var newHash = occupiedSeats.map(function(s) { return seatHash(s); }).join('|');
+  if (newHash === lastSeatsHash) return;  // no change
+  lastSeatsHash = newHash;
+
+  // Render only occupied seats — no empty gaps
+  container.innerHTML = '';
+  occupiedSeats.forEach(function(seat) {
+    var slot = document.createElement('div');
+    slot.className = 'seat-slot';
+    slot.innerHTML = buildSeatBoxHtml(seat);
+    container.appendChild(slot);
+  });
 }
 
 // -- Find hero seat --
@@ -1125,7 +1289,7 @@ document.addEventListener('DOMContentLoaded', function() {
     forceTestActive = !forceTestActive;
     this.classList.toggle('active', forceTestActive);
     this.textContent = forceTestActive ? 'TESTING...' : 'FORCE TEST';
-    renderedSeats = {};
+    renderedSeats = {}; lastSeatsHash = null;
     render();
     console.log('[REMOTE] Force test ' + (forceTestActive ? 'ON' : 'OFF'));
   });
@@ -1168,6 +1332,20 @@ document.addEventListener('DOMContentLoaded', function() {
       var tsn = Number(scToggle.dataset.scSeat);
       var ttype = scToggle.dataset.scPreact;
       handlePreAction(tsn, ttype);
+      return;
+    }
+
+    // ---- Buy-in dialog trigger ----
+    var buyinBtn = e.target.closest('[data-buyin-seat]');
+    if (buyinBtn) {
+      openBuyinDialog(Number(buyinBtn.dataset.buyinSeat));
+      return;
+    }
+
+    // ---- Buy-in dialog buttons ----
+    var buyinAction = e.target.closest('[data-buyin-action]');
+    if (buyinAction) {
+      handleBuyinAction(buyinAction.dataset.buyinAction, buyinAction.dataset.buyinSeat ? Number(buyinAction.dataset.buyinSeat) : null);
       return;
     }
 
@@ -1224,14 +1402,24 @@ document.addEventListener('DOMContentLoaded', function() {
 
 function handlePreAction(seatNo, type) {
   if (type === 'kh') {
+    // MAX 2 KH per hand — block if trying to select a 3rd
+    if (!khState[seatNo]) {
+      var khActive = 0;
+      for (var k in khState) { if (khState[k]) khActive++; }
+      if (khActive >= 2) {
+        console.log('[KH] BLOCKED seat=' + seatNo + ' — max 2 KH per hand');
+        logCmd(seatNo, 'KH', null, false, 'MAX 2 — deselect one first');
+        return;
+      }
+    }
     khState[seatNo] = !khState[seatNo];
     console.log('[KH] ' + (khState[seatNo] ? 'marked' : 'unmarked') + ' seat=' + seatNo);
-    renderedSeats = {}; lastEmgHash = null; render(); return;
+    renderedSeats = {}; lastSeatsHash = null; lastEmgHash = null; render(); return;
   }
   if (type === 'auto_cc_preflop') {
     autoCcPreflop[seatNo] = !autoCcPreflop[seatNo];
     console.log('[AUTO_CC_PREFLOP] ' + (autoCcPreflop[seatNo] ? 'armed' : 'disarmed') + ' seat=' + seatNo);
-    renderedSeats = {}; lastEmgHash = null; render(); return;
+    renderedSeats = {}; lastSeatsHash = null; lastEmgHash = null; render(); return;
   }
   if (type === 'cashout') {
     var newVal = !cashoutState[seatNo];
@@ -1258,7 +1446,7 @@ function handlePreAction(seatNo, type) {
     }
   }
   // Force re-render to update toggle states
-  renderedSeats = {};
+  renderedSeats = {}; lastSeatsHash = null;
   lastEmgHash = null;
   render();
 }
@@ -1314,58 +1502,140 @@ function applyPreset(seatNo, preset, prefix) {
   }
 }
 
-// -- Global AUTO C/C toggle --
-// -- Execute KH: auto C/F all non-KH seats, highlight KH seats --
+// EXECUTE KH: C/F all hands EXCEPT seats with KH pre-selected
+// Condition: KH button must be toggled ON per seat BEFORE executing
+// Behavior:
+//   - No CO on KH seats → KH seats = manual play, rest = C/F
+//   - CO on one KH seat → RAISE WAR: both KH seats auto-raise max at each other
+//     until one is out of chips, then CO fires cashout on the CO-marked seat
+//   - RAISE WAR: non-KH seats get FOLD immediately (not just check_fold)
+//     because they may have already called/raised and need to exit NOW
 function executeKH() {
   if (!lastTable || !Array.isArray(lastTable.seats)) return;
-  var khCount = 0, cfCount = 0;
+  console.log('[KH_EXEC] triggered — scanning seats...');
+  var khSeats = [];
+  var coSeat = null;
+  var foldCount = 0;
+
+  // Identify KH seats and check for CO
   lastTable.seats.forEach(function(seat) {
-    if (!seat.is_self_player && !seat.is_hero) return;
+    if (!seat.is_self_player) return;
     if (!seat.name || seat.name === 'Empty') return;
     var sn = getSeatNo(seat);
     if (khState[sn]) {
-      khCount++;
-      console.log('[KH] KEEP seat=' + sn + ' name=' + seat.name + ' — manual input required');
-    } else {
-      cfCount++;
-      preActionState[sn] = 'check_fold';
-      sendCmd(sn, 'check_fold');
-      console.log('[KH] AUTO_CF seat=' + sn + ' name=' + seat.name);
+      khSeats.push(sn);
+      if (cashoutState[sn]) coSeat = sn;
+      console.log('[KH_EXEC] KH seat=' + sn + ' name=' + seat.name + (cashoutState[sn] ? ' +CO' : ''));
     }
   });
-  console.log('[KH] executeKH complete: ' + khCount + ' KH (manual), ' + cfCount + ' auto-C/F');
+
+  if (khSeats.length === 0) {
+    console.log('[KH_EXEC] ABORTED — no KH seats selected');
+    logCmd(0, 'KH EXECUTE', null, false, 'No KH seats selected');
+    return;
+  }
+
+  // 2 KH seats = RAISE WAR (always). CO determines which seat cashes out.
+  if (khSeats.length === 2) {
+    khRaiseWar = true;
+    khRaiseSeats = khSeats;
+    khCOSeat = coSeat;  // may be null if no CO selected — war still fires
+
+    // FOLD all non-KH seats immediately — they must exit the hand NOW
+    // regardless of whether they've already raised/called
+    lastTable.seats.forEach(function(seat) {
+      if (!seat.is_self_player) return;
+      if (!seat.name || seat.name === 'Empty') return;
+      var sn = getSeatNo(seat);
+      if (!khState[sn]) {
+        preActionState[sn] = 'check_fold';
+        var acts = seat.available_actions || [];
+        if (acts.indexOf('fold') >= 0) {
+          sendCmd(sn, 'fold');
+          console.log('[KH_EXEC] FOLD NOW seat=' + sn + ' name=' + seat.name);
+        } else {
+          sendCmd(sn, 'check_fold');
+          console.log('[KH_EXEC] C/F armed seat=' + sn + ' name=' + seat.name);
+        }
+        foldCount++;
+      }
+    });
+
+    // Arm cashout on CO seat if selected
+    if (coSeat) {
+      sendCmd(coSeat, 'cashout_pre');
+      console.log('[KH_EXEC] RAISE WAR: seats ' + khSeats.join(' vs ') + ' — CO armed on seat ' + coSeat + ', ' + foldCount + ' seats folding');
+      logCmd(0, 'KH EXECUTE', null, true, 'RAISE WAR: ' + khSeats.join(' vs ') + ' | CO→seat ' + coSeat + ' | ' + foldCount + ' fold');
+    } else {
+      console.log('[KH_EXEC] RAISE WAR: seats ' + khSeats.join(' vs ') + ' — no CO, ' + foldCount + ' seats folding');
+      logCmd(0, 'KH EXECUTE', null, true, 'RAISE WAR: ' + khSeats.join(' vs ') + ' | ' + foldCount + ' fold');
+    }
+  } else {
+    // 1 KH seat only — manual play, C/F for rest
+    khRaiseWar = false;
+    khRaiseSeats = [];
+    khCOSeat = null;
+
+    lastTable.seats.forEach(function(seat) {
+      if (!seat.is_self_player) return;
+      if (!seat.name || seat.name === 'Empty') return;
+      var sn = getSeatNo(seat);
+      if (!khState[sn]) {
+        preActionState[sn] = 'check_fold';
+        sendCmd(sn, 'check_fold');
+        foldCount++;
+        console.log('[KH_EXEC] C/F seat=' + sn + ' name=' + seat.name);
+      }
+    });
+
+    console.log('[KH_EXEC] complete: ' + khSeats.length + ' MANUAL, ' + foldCount + ' C/F');
+    logCmd(0, 'KH EXECUTE', null, true, khSeats.length + ' MANUAL, ' + foldCount + ' C/F');
+  }
+
+  khExecuted = true;
   var btn = document.getElementById('execute-kh-btn');
   if (btn) { btn.classList.add('active-kh'); setTimeout(function() { btn.classList.remove('active-kh'); }, 2000); }
-  renderedSeats = {}; lastEmgHash = null; render();
+  renderedSeats = {}; lastSeatsHash = null; lastEmgHash = null; render();
 }
 
-function toggleGlobalAutoCC() {
+// C/C ALL PREFLOP: toggle on = every hero seat checks or calls during preflop
+// Condition: ONLY fires when street === PREFLOP
+// Behavior: if check available → check. if call available → call. Flat to see flop.
+function toggleCCPreflop() {
   globalAutoCcPreflop = !globalAutoCcPreflop;
-  var btn = document.getElementById('global-autocc-btn');
+  var btn = document.getElementById('global-cc-preflop-btn');
   if (btn) btn.classList.toggle('active', globalAutoCcPreflop);
-  console.log('[AUTO_CC_PREFLOP_ALL] ' + (globalAutoCcPreflop ? 'enabled' : 'disabled'));
-  renderedSeats = {}; lastEmgHash = null; render();
+  console.log('[C/C_ALL_PREFLOP] ' + (globalAutoCcPreflop ? 'ON — all seats will flat preflop' : 'OFF'));
+  // Immediately fire on all seats if turning ON and we're in preflop
+  if (globalAutoCcPreflop) fireCCPreflop();
+  renderedSeats = {}; lastSeatsHash = null; lastEmgHash = null; render();
 }
+// Keep old name for backward compat
+function toggleGlobalAutoCC() { toggleCCPreflop(); }
 
-// -- Global SELECT ALL AUTO C/F --
+// C/F ALL: check/fold all players, any street
+// Condition: none (all streets). Arms check_fold pre-action on every hero seat.
+// When their turn comes: if check available → check. Otherwise → fold.
 function toggleGlobalAutoCF() {
   globalAutoCF = !globalAutoCF;
   var btn = document.getElementById('global-cf-btn');
   if (btn) btn.classList.toggle('active-cf', globalAutoCF);
-  console.log('[AUTO_CF_ALL] ' + (globalAutoCF ? 'enabled' : 'disabled'));
-  globalCFExcluded = {};  // clear exclusions on toggle
+  console.log('[C/F_ALL] ' + (globalAutoCF ? 'ON — all seats check/fold' : 'OFF'));
+  globalCFExcluded = {};
   if (globalAutoCF && lastTable && Array.isArray(lastTable.seats)) {
-    // Tick C/F for every visible hero seat
+    var count = 0;
     lastTable.seats.forEach(function(seat) {
-      if (!seat.is_self_player && !seat.is_hero) return;
+      if (!seat.is_self_player) return;
       if (!seat.name || seat.name === 'Empty') return;
       var sn = getSeatNo(seat);
       preActionState[sn] = 'check_fold';
       sendCmd(sn, 'check_fold');
+      count++;
     });
-    console.log('[AUTO_CF_ALL] armed all visible seats');
+    console.log('[C/F_ALL] armed ' + count + ' seats');
+    logCmd(0, 'C/F ALL', null, true, count + ' seats armed');
   }
-  renderedSeats = {}; lastEmgHash = null; render();
+  renderedSeats = {}; lastSeatsHash = null; lastEmgHash = null; render();
 }
 
 // -- Apply globalAutoCF to new players appearing mid-hand --
@@ -1383,53 +1653,471 @@ function applyGlobalCFToNewSeats() {
   });
 }
 
-// -- AUTO C/C PREFLOP auto-fire --
-function fireAutoCcPreflop() {
+// ================================================================
+//  GET SEATED — Players & Tables Panel
+// ================================================================
+
+function togglePlayersPanel() {
+  var panel = document.getElementById('players-panel');
+  if (panel.style.display === 'none') {
+    panel.style.display = 'block';
+    loadPlayers();
+    loadTables();
+  } else {
+    panel.style.display = 'none';
+  }
+}
+
+function loadPlayers() {
+  fetch(API + '/players').then(function(r) { return r.json(); }).then(function(players) {
+    var active = players.filter(function(p) { return p.container_name; });
+    var html = '<table style="width:100%;font-size:10px;border-collapse:collapse;">';
+    html += '<tr style="color:#58a6ff;border-bottom:1px solid #333;"><th style="text-align:left;padding:3px;">Player</th><th>Container</th><th>EIP</th><th>Table</th><th>Action</th></tr>';
+    active.forEach(function(p) {
+      html += '<tr style="border-bottom:1px solid #1a1e28;">';
+      html += '<td style="padding:3px;color:#e0e0e0;font-weight:700;">' + esc(p.username) + '</td>';
+      html += '<td style="color:#888;text-align:center;">' + esc(p.container_name || '-') + '</td>';
+      html += '<td style="color:#4caf50;text-align:center;font-size:9px;">' + esc(p.eip || '-') + '</td>';
+      html += '<td style="color:#ff9800;text-align:center;">' + esc(p.table_name || '-') + '</td>';
+      html += '<td style="text-align:center;"><select data-assign-player="' + esc(p.username) + '" onchange="assignTable(this)" style="background:#1a1e28;border:1px solid #444;color:#e0e0e0;border-radius:3px;font-size:9px;padding:1px 4px;"><option value="">--</option></select></td>';
+      html += '</tr>';
+    });
+    html += '</table>';
+    document.getElementById('players-list').innerHTML = html;
+    // Populate table dropdowns after tables loaded
+    setTimeout(populateTableDropdowns, 500);
+  }).catch(function() {
+    document.getElementById('players-list').innerHTML = '<span style="color:#f44336;font-size:10px;">Failed to load players</span>';
+  });
+}
+
+var cachedTables = [];
+function loadTables() {
+  fetch(API + '/tables/available?game_type=PLO6').then(function(r) { return r.json(); }).then(function(data) {
+    if (data.ok) {
+      cachedTables = data.tables;
+      var html = '<div style="font-size:10px;color:#888;margin-bottom:4px;">Available Tables (' + data.count + '):</div>';
+      html += '<div style="display:flex;gap:6px;flex-wrap:wrap;">';
+      data.tables.forEach(function(t) {
+        html += '<span style="background:#1a1e28;border:1px solid #444;border-radius:4px;padding:3px 8px;font-size:10px;color:#ff9800;">' + esc(t.table_name) + ' <span style="color:#888;">' + esc(t.stakes_display) + '</span></span>';
+      });
+      html += '</div>';
+      document.getElementById('tables-list').innerHTML = html;
+      populateTableDropdowns();
+    }
+  }).catch(function() {});
+}
+
+function populateTableDropdowns() {
+  var selects = document.querySelectorAll('[data-assign-player]');
+  selects.forEach(function(sel) {
+    if (sel.options.length > 1) return;
+    cachedTables.forEach(function(t) {
+      var opt = document.createElement('option');
+      opt.value = t.table_name;
+      opt.textContent = t.table_name;
+      sel.appendChild(opt);
+    });
+  });
+}
+
+function assignTable(sel) {
+  var username = sel.dataset.assignPlayer;
+  var tableName = sel.value;
+  if (!tableName) return;
+  fetch(API + '/players/' + username, {
+    method: 'PUT',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({table_name: tableName})
+  }).then(function(r) { return r.json(); }).then(function() {
+    logCmd(0, 'ASSIGN', null, true, username + ' → ' + tableName);
+    loadPlayers();
+  });
+}
+
+function addPlayerSubmit() {
+  var user = document.getElementById('ap-user').value.trim();
+  var pass = document.getElementById('ap-pass').value.trim();
+  var container = document.getElementById('ap-container').value.trim();
+  var eip = document.getElementById('ap-eip').value.trim();
+  if (!user || !pass) { document.getElementById('ap-msg').textContent = 'Username + password required'; document.getElementById('ap-msg').style.color = '#f44336'; return; }
+  fetch(API + '/players', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({username: user, password: pass, container_name: container || null, eip: eip || null})
+  }).then(function(r) { return r.json(); }).then(function(j) {
+    if (j.status === 'created') {
+      document.getElementById('ap-msg').textContent = 'Added: ' + user;
+      document.getElementById('ap-msg').style.color = '#4caf50';
+      document.getElementById('ap-user').value = '';
+      document.getElementById('ap-pass').value = '';
+      document.getElementById('ap-container').value = '';
+      document.getElementById('ap-eip').value = '';
+      loadPlayers();
+    } else {
+      document.getElementById('ap-msg').textContent = j.error || 'Failed';
+      document.getElementById('ap-msg').style.color = '#f44336';
+    }
+  });
+}
+
+// ================================================================
+//  BUY-IN DIALOG (mirrors PokerBet sg-buy-in-modal)
+// ================================================================
+
+var buyinDialogSeat = null;
+
+function openBuyinDialog(seatNo) {
+  buyinDialogSeat = seatNo;
+  // Find player name
+  var playerName = 'Seat ' + seatNo;
+  if (lastTable && Array.isArray(lastTable.seats)) {
+    for (var i = 0; i < lastTable.seats.length; i++) {
+      var sn = getSeatNo(lastTable.seats[i]);
+      if (sn === seatNo && lastTable.seats[i].name) {
+        playerName = lastTable.seats[i].name;
+        break;
+      }
+    }
+  }
+
+  var overlay = document.createElement('div');
+  overlay.className = 'buyin-overlay';
+  overlay.id = 'buyin-overlay';
+  overlay.innerHTML =
+    '<div class="buyin-modal">' +
+      '<h3>BUY IN</h3>' +
+      '<div class="buyin-player">Player: <b>' + esc(playerName) + '</b> — Seat ' + seatNo + '</div>' +
+      '<div class="buyin-presets">' +
+        '<button data-buyin-action="min" data-buyin-seat="' + seatNo + '">MIN</button>' +
+        '<button data-buyin-action="max" data-buyin-seat="' + seatNo + '">MAX</button>' +
+      '</div>' +
+      '<div class="buyin-amount-row">' +
+        '<input type="number" id="buyin-custom-amount" placeholder="Custom amount" min="0" step="1">' +
+      '</div>' +
+      '<div class="buyin-actions">' +
+        '<button class="buyin-confirm" data-buyin-action="custom" data-buyin-seat="' + seatNo + '">CONFIRM</button>' +
+        '<button class="buyin-cancel" data-buyin-action="cancel">CANCEL</button>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(overlay);
+
+  // Close on overlay background click
+  overlay.addEventListener('click', function(e) {
+    if (e.target === overlay) closeBuyinDialog();
+  });
+}
+
+function closeBuyinDialog() {
+  var overlay = document.getElementById('buyin-overlay');
+  if (overlay) overlay.remove();
+  buyinDialogSeat = null;
+}
+
+function handleBuyinAction(action, seatNo) {
+  if (action === 'cancel') {
+    closeBuyinDialog();
+    return;
+  }
+  if (action === 'max') {
+    // PokerBet: clicks avatar → sg-buy-in-modal → .modal-balance-v li:nth-child(2) .last-v-p button → confirm
+    sendCmd(seatNo, 'rebuy_max');
+    logCmd(seatNo, 'BUY IN MAX', null, true, '');
+    closeBuyinDialog();
+    return;
+  }
+  if (action === 'min') {
+    // PokerBet: clicks avatar → sg-buy-in-modal → .modal-balance-v li:nth-child(2) .mini-button-view-m:first-child button → confirm
+    sendCmd(seatNo, 'rebuy_min');
+    logCmd(seatNo, 'BUY IN MIN', null, true, '');
+    closeBuyinDialog();
+    return;
+  }
+  if (action === 'custom') {
+    var amtInput = document.getElementById('buyin-custom-amount');
+    var amt = amtInput ? Number(amtInput.value) : null;
+    if (!amt || amt <= 0) {
+      amtInput.style.borderColor = '#f44336';
+      return;
+    }
+    // PokerBet: clicks avatar → sg-buy-in-modal → sets input value → .modal-button-container button
+    sendCmd(seatNo, 'buyin', amt);
+    logCmd(seatNo, 'BUY IN', amt, true, 'R' + amt);
+    closeBuyinDialog();
+    return;
+  }
+}
+
+// ================================================================
+//  CONDITIONAL GLOBAL COMMANDS
+// ================================================================
+
+// FOLD ALL: only fires on seats where fold is in available_actions (their turn)
+// Condition: seat.is_self_player AND 'fold' in available_actions
+// Skips: KH-marked seats
+function globalFoldAll() {
+  if (!lastTable || !Array.isArray(lastTable.seats)) return;
+  var foldCount = 0, skipCount = 0;
+  lastTable.seats.forEach(function(seat) {
+    if (!seat.is_self_player) return;
+    if (!seat.name || seat.name === 'Empty') return;
+    var sn = getSeatNo(seat);
+    var acts = seat.available_actions || [];
+    // Skip KH-marked seats
+    if (khState[sn]) {
+      skipCount++;
+      console.log('[FOLD_ALL] SKIP seat=' + sn + ' (KH marked)');
+      return;
+    }
+    // Only fold if fold is actually available (it's their turn)
+    if (acts.indexOf('fold') >= 0) {
+      sendCmd(sn, 'fold');
+      foldCount++;
+      console.log('[FOLD_ALL] FOLD seat=' + sn + ' name=' + seat.name);
+    }
+  });
+  console.log('[FOLD_ALL] complete: ' + foldCount + ' folded, ' + skipCount + ' KH skipped');
+  logCmd(0, 'FOLD ALL', null, true, foldCount + ' folded, ' + skipCount + ' KH skipped');
+}
+
+// BUY IN ALL: only fires on hero seats where stack is below 50% of table max buy-in
+// Condition: seat.is_self_player AND stack_zar < rebuyThreshold
+// Sends: rebuy_max (clicks avatar → sg-buy-in-modal → MAX → confirm)
+var REBUY_THRESHOLD_PCT = 0.5;  // rebuy when stack < 50% of max at table
+function globalBuyinAll() {
+  if (!lastTable || !Array.isArray(lastTable.seats)) return;
+  // Determine max stack at table as proxy for table buy-in
+  var maxStack = 0;
+  lastTable.seats.forEach(function(seat) {
+    if (seat.stack_zar && seat.stack_zar > maxStack) maxStack = seat.stack_zar;
+  });
+  var threshold = maxStack * REBUY_THRESHOLD_PCT;
+  if (threshold < 1) threshold = 100; // fallback minimum
+
+  var buyCount = 0, skipCount = 0;
+  lastTable.seats.forEach(function(seat) {
+    if (!seat.is_self_player) return;
+    if (!seat.name || seat.name === 'Empty') return;
+    var sn = getSeatNo(seat);
+    // Only rebuy if stack is below threshold
+    if (seat.stack_zar != null && seat.stack_zar < threshold) {
+      sendCmd(sn, 'rebuy_max');
+      buyCount++;
+      console.log('[BUYIN_ALL] REBUY seat=' + sn + ' stack=R' + seat.stack_zar.toFixed(2) + ' < threshold=R' + threshold.toFixed(2));
+    } else {
+      skipCount++;
+    }
+  });
+  console.log('[BUYIN_ALL] complete: ' + buyCount + ' rebuying, ' + skipCount + ' above threshold (R' + threshold.toFixed(2) + ')');
+  logCmd(0, 'BUY IN ALL', null, true, buyCount + ' rebuying (threshold R' + threshold.toFixed(0) + ')');
+}
+
+// SIT OUT ALL: sends sit_out to all hero seats
+// Condition: seat.is_self_player (always available)
+function globalSitOutAll() {
+  if (!lastTable || !Array.isArray(lastTable.seats)) return;
+  var count = 0;
+  lastTable.seats.forEach(function(seat) {
+    if (!seat.is_self_player) return;
+    if (!seat.name || seat.name === 'Empty') return;
+    var sn = getSeatNo(seat);
+    sendCmd(sn, 'sit_out');
+    count++;
+    console.log('[SIT_OUT_ALL] seat=' + sn);
+  });
+  console.log('[SIT_OUT_ALL] complete: ' + count + ' seats');
+  logCmd(0, 'SIT OUT ALL', null, true, count + ' seats');
+}
+
+// RESUME ALL: sends resume/back_to_game to all hero seats
+// Condition: seat.is_self_player (fires on all — w4p.js will only click if button visible)
+function globalResumeAll() {
+  if (!lastTable || !Array.isArray(lastTable.seats)) return;
+  var count = 0;
+  lastTable.seats.forEach(function(seat) {
+    if (!seat.is_self_player) return;
+    if (!seat.name || seat.name === 'Empty') return;
+    var sn = getSeatNo(seat);
+    sendCmd(sn, 'back_to_game');
+    count++;
+    console.log('[RESUME_ALL] seat=' + sn);
+  });
+  console.log('[RESUME_ALL] complete: ' + count + ' seats');
+  logCmd(0, 'RESUME ALL', null, true, count + ' seats');
+}
+
+// -- KH RAISE WAR engine --
+// When active: both KH seats auto-raise/bet max whenever it's their turn
+// Non-KH seats get auto-folded whenever they have action (re-raised into the hand)
+// When one seat runs out of chips (stack=0 or no raise available): CO fires on CO seat
+var khRaiseLastSent = {};  // seatNo -> timestamp (throttle)
+function fireKHRaiseWar() {
+  if (!khRaiseWar || !lastTable || !Array.isArray(lastTable.seats)) return;
+  var now = Date.now();
+
+  lastTable.seats.forEach(function(seat) {
+    if (!seat.is_self_player) return;
+    var sn = getSeatNo(seat);
+    var acts = seat.available_actions || [];
+    if (acts.length === 0) return;
+
+    // Throttle: max one command per seat per 500ms
+    var lastSent = khRaiseLastSent[sn] || 0;
+    if (now - lastSent < 500) return;
+
+    // NON-KH seats: auto-fold regardless — they must exit the hand
+    if (khRaiseSeats.indexOf(sn) < 0) {
+      if (acts.indexOf('fold') >= 0) {
+        sendCmd(sn, 'fold');
+        khRaiseLastSent[sn] = now;
+        console.log('[KH_WAR] AUTO-FOLD seat=' + sn + ' (non-KH, forced out)');
+      } else if (acts.indexOf('check') >= 0) {
+        sendCmd(sn, 'check');
+        khRaiseLastSent[sn] = now;
+        console.log('[KH_WAR] CHECK seat=' + sn + ' (non-KH, no fold available)');
+      }
+      return;
+    }
+
+    // KH seats: raise/bet max → call → check (war escalation)
+    if (acts.indexOf('raise') >= 0) {
+      sendCmd(sn, 'raise_max');
+      khRaiseLastSent[sn] = now;
+      console.log('[KH_WAR] RAISE MAX seat=' + sn);
+    } else if (acts.indexOf('bet') >= 0) {
+      // First-to-act on new street = BET (not raise)
+      sendCmd(sn, 'raise_max');
+      khRaiseLastSent[sn] = now;
+      console.log('[KH_WAR] BET MAX seat=' + sn);
+    } else if (acts.indexOf('call') >= 0) {
+      // All-in call if can't raise
+      sendCmd(sn, 'call');
+      khRaiseLastSent[sn] = now;
+      console.log('[KH_WAR] CALL (all-in) seat=' + sn);
+    } else if (acts.indexOf('check') >= 0) {
+      sendCmd(sn, 'check');
+      khRaiseLastSent[sn] = now;
+      console.log('[KH_WAR] CHECK seat=' + sn);
+    }
+  });
+
+  // War ends when neither KH seat has raise/call/bet available (hand over)
+  var warActive = false;
+  lastTable.seats.forEach(function(seat) {
+    if (!seat.is_self_player) return;
+    var sn = getSeatNo(seat);
+    if (khRaiseSeats.indexOf(sn) < 0) return;
+    var acts = seat.available_actions || [];
+    if (acts.length > 0) warActive = true;
+  });
+  if (!warActive && khExecuted) {
+    console.log('[KH_WAR] hand resolved — war complete, CO pre-armed');
+    khRaiseWar = false;
+  }
+}
+
+// -- C/C ALL PREFLOP engine --
+// Fires on every poll cycle. Condition: street === PREFLOP only.
+// If seat has check → sends check. If seat has call → sends call.
+// Also arms check_call pre-action so w4p.js auto-executes when turn arrives.
+function fireCCPreflop() {
   if (!lastTable || !Array.isArray(lastTable.seats)) return;
   var street = (lastTable.street || '').toUpperCase();
-  var now = Date.now();
+  if (street !== 'PREFLOP') return;  // HARD CONDITION: preflop only
   lastTable.seats.forEach(function(seat) {
     if (!seat.is_self_player) return;
     var sn = getSeatNo(seat);
     var enabled = globalAutoCcPreflop === true || autoCcPreflop[sn] === true;
     if (!enabled) return;
-    if (street !== 'PREFLOP') return;
-    // Re-send check_call every 3s to keep it armed through entire preflop
-    var lastSent = autoCcLastSent[sn] || 0;
-    if (now - lastSent < 3000) return;
-    autoCcLastSent[sn] = now;
-    preActionState[sn] = 'check_call';
-    sendCmd(sn, 'check_call');
-    console.log('[AUTO_CC_PREFLOP] armed seat=' + sn + ' src=' + (globalAutoCcPreflop ? 'global' : 'per-player'));
-    renderedSeats = {};
+    // ONCE per seat per hand — never re-send (prevents leak into flop)
+    if (autoCcLastSent[sn]) return;
+    var acts = seat.available_actions || [];
+    if (acts.length === 0) return;  // not their turn yet, wait for next cycle
+    // Send exactly once
+    autoCcLastSent[sn] = true;
+    preActionState[sn] = 'check_call';  // UI indicator only
+    if (acts.indexOf('check') >= 0) {
+      sendCmd(sn, 'check');
+      console.log('[C/C_PREFLOP] CHECK seat=' + sn + ' (once)');
+    } else if (acts.indexOf('call') >= 0) {
+      sendCmd(sn, 'call');
+      console.log('[C/C_PREFLOP] CALL seat=' + sn + ' (once)');
+    }
   });
 }
+// Keep old name
+function fireAutoCcPreflop() { fireCCPreflop(); }
 
-// -- New-hand detection --
+// -- New-hand detection + street transition --
 
 function checkNewHand() {
   if (!lastTable || !lastTable.board) return;
-  var b = lastTable.board;
-  var flopStr = Array.isArray(b.flop) ? b.flop.join(',') : '';
-  var boardKey = lastTable.street + ':' + flopStr;
-  if (lastBoardKey !== null && lastBoardKey !== boardKey) {
-    var isPreflop = boardKey.indexOf('PREFLOP:') === 0;
-    if (isPreflop || flopStr !== lastBoardKey.split(':').slice(1).join(':')) {
+
+  // STREET TRANSITION: when leaving PREFLOP, clear all check_call pre-actions
+  // This prevents stale C/C commands from firing on the flop
+  var curStreet = (lastTable.street || '').toUpperCase();
+  if (lastStreet === 'PREFLOP' && curStreet !== 'PREFLOP' && curStreet !== '') {
+    console.log('[STREET] PREFLOP → ' + curStreet + ' — clearing C/C pre-actions');
+    if (lastTable && Array.isArray(lastTable.seats)) {
+      lastTable.seats.forEach(function(seat) {
+        if (!seat.is_self_player) return;
+        var sn = getSeatNo(seat);
+        if (preActionState[sn] === 'check_call') {
+          preActionState[sn] = null;
+          sendCmd(sn, 'clear');
+          console.log('[STREET] cleared check_call seat=' + sn);
+        }
+      });
+    }
+    // Disable global C/C preflop toggle (it only applies to preflop)
+    globalAutoCcPreflop = false;
+    var ccBtn = document.getElementById('global-cc-preflop-btn');
+    if (ccBtn) ccBtn.classList.remove('active');
+  }
+  lastStreet = curStreet;
+
+  // NEW HAND DETECTION: use hole cards hash — when cards change, it's a new deal
+  var holeHash = '';
+  if (lastTable && Array.isArray(lastTable.seats)) {
+    lastTable.seats.forEach(function(seat) {
+      if (!seat.is_self_player) return;
+      var sn = getSeatNo(seat);
+      var cards = Array.isArray(seat.hole_cards) ? seat.hole_cards.join(',') : '';
+      holeHash += sn + ':' + cards + '|';
+    });
+  }
+  if (lastHoleHash !== null && holeHash !== lastHoleHash && holeHash !== '') {
+    var isNewHand = true;
+    if (isNewHand) {
+      // ── FULL RESET: all buttons, all state, all globals ──
       preActionState = {};
       cashoutState = {};
       autoCcPreflop = {};
       khState = {};
+      khExecuted = false;
+      khRaiseWar = false;
+      khRaiseSeats = [];
+      khCOSeat = null;
+      khRaiseLastSent = {};
       autoCcLastSent = {};
       globalCFExcluded = {};
-      console.log('[AUTO_CC_PREFLOP] reset_new_hand');
       seatAmounts = {};
       emgAmount = null;
-      renderedSeats = {};
+      renderedSeats = {}; lastSeatsHash = null;
       lastEmgHash = null;
-      console.log('[REMOTE] checkbox states reset after hand transition');
+
+      // Reset global toggles
+      globalAutoCcPreflop = false;
+      globalAutoCF = false;
+      var ccBtn = document.getElementById('global-cc-preflop-btn');
+      if (ccBtn) ccBtn.classList.remove('active');
+      var cfBtn = document.getElementById('global-cf-btn');
+      if (cfBtn) cfBtn.classList.remove('active-cf');
+
+      console.log('[NEW HAND] all buttons reset — cards changed');
     }
   }
-  lastBoardKey = boardKey;
+  lastHoleHash = holeHash;
 }
 
 // -- Main render --
@@ -1442,11 +2130,54 @@ function render() {
   renderEmergencyPanel();
   applyGlobalCFToNewSeats();
   fireAutoCcPreflop();
+  fireKHRaiseWar();
+}
+
+// -- Demo data for layout preview --
+var DEMO_NAMES = ['kele1', 'shaxville', 'pretty88', 'DanielleK', 'pile_za', 'hele_q', 'kana42', 'lont_sa', 'midori9'];
+var DEMO_CARDS = [['Ah','Kh','Qh','Jh'],['As','Ks','Qs','Js'],['Ad','Kd','Qd','Jd'],['Ac','Kc','Qc','Jc'],['Th','9h','8h','7h'],['Ts','9s','8s','7s'],['Td','9d','8d','7d'],['Tc','9c','8c','7c'],['6h','5h','4h','3h']];
+
+function buildDemoTable() {
+  var seats = [];
+  for (var i = 0; i < 9; i++) {
+    seats.push({
+      seat_no: i + 1,
+      seat_index: i + 1,
+      name: DEMO_NAMES[i],
+      stack_zar: Math.round((500 + Math.random() * 2000) * 100) / 100,
+      hole_cards: DEMO_CARDS[i],
+      is_self_player: true,
+      is_dealer: i === 3,
+      bet: i === 1 ? 10 : (i === 5 ? 25 : 0),
+      available_actions: i === 0 ? ['fold','check','call','raise'] : [],
+      buttons: i === 0 ? { actions: [{action:'fold'},{action:'check'},{action:'call'},{action:'raise',amount:50}], slider: {min:25,max:2500,step:5,current:50} } : null,
+      status: 'active'
+    });
+  }
+  return {
+    table_id: 'demo-001',
+    street: 'FLOP',
+    pot_zar: 185.50,
+    state_version: 'demo',
+    board: { flop: ['Ah','Kd','7c'], turn: null, river: null },
+    seats: seats
+  };
 }
 
 // -- Init & poll --
 
 console.log('[REMOTE] ' + VERSION + ' loaded');
+
+// Show demo table on load if no live data within 2s
+var demoTimer = setTimeout(function() {
+  if (!lastTable) {
+    lastTable = buildDemoTable();
+    _lastTableJSON = JSON.stringify(lastTable);
+    scheduleRender();
+    console.log('[REMOTE] Demo mode - showing layout preview');
+  }
+}, 2000);
+
 fetchTable();
 // schedulePoll() is called inside fetchTable .then/.catch — no setInterval
 </script>

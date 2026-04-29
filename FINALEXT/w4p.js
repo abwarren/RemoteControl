@@ -1252,6 +1252,12 @@
       // New hand — clear pre-actions but NOT cashout preselect
       _preAction = null;
     }
+    // Street transition: clear check_call pre-action when leaving preflop
+    // (C/C ALL PREFLOP is preflop-only; stale pre-action must not fire on flop)
+    if (_preAction === 'check_call' && snap.street && snap.street !== 'PREFLOP') {
+      console.log('[W4P] Clearing stale check_call pre-action — street=' + snap.street);
+      _preAction = null;
+    }
     _lastBoardLen = boardLen;
 
     // Try cashout BEFORE mode calculation (cashout button may appear at any time)
