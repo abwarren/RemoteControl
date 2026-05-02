@@ -21,7 +21,7 @@ import logging
 from datetime import datetime
 from pathlib import Path
 import json
-from flask import Flask, request, jsonify, send_from_directory, send_file, make_response
+from flask import Flask, request, jsonify, send_from_directory, send_file, make_response, Response
 from flask_cors import CORS
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
@@ -29,26 +29,16 @@ from flask_limiter.util import get_remote_address
 # ── App setup ──────────────────────────────────────────────────────────────────
 
 app = Flask(__name__)
-CORS(app, origins=r".*", supports_credentials=False)  # API-key authenticated, allow cross-origin from poker iframes
+CORS(app)
 
-@app.before_request
-def handle_options_preflight():
-    if request.method == "OPTIONS":
-        return "", 204
-
-# ── Explicit CORS headers (Flask-CORS 6.x misses OPTIONS preflight) ──────────
+# Chrome Private Network Access (PNA) — required when browsers resolve
+# potlimitomaha.xyz to a private IP (172.31.17.239) via hosts file.
+# Without this, Chrome blocks fetches from public origins to private addresses.
 @app.after_request
-def add_cors_headers(response):
-    origin = request.headers.get('Origin', '*')
-    response.headers['Access-Control-Allow-Origin'] = origin
-    response.headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS'
-    response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization, X-API-Key'
-    response.headers['Access-Control-Max-Age'] = '86400'
-    response.headers["Access-Control-Allow-Private-Network"] = "true"
+def _add_private_network_access(response):
+    if request.headers.get('Access-Control-Request-Private-Network'):
+        response.headers['Access-Control-Allow-Private-Network'] = 'true'
     return response
-
-# Reject oversized request bodies (1MB max)
-app.config['MAX_CONTENT_LENGTH'] = 1 * 1024 * 1024
 
 # Register equity engine routes (SSE streaming for /api/run, /api/stream)
 from equity_routes import register_equity_routes
@@ -56,10 +46,6 @@ register_equity_routes(app)
 # Register Windows instance management routes
 from windows_routes import register_windows_routes
 register_windows_routes(app)
-
-# Register BLM (Basketball League Manager) routes
-from blm_routes import register_blm_routes
-register_blm_routes(app)
 
 # Send Flask logs to stdout so systemd/journald captures them
 logging.basicConfig(
@@ -87,10 +73,7 @@ from functools import wraps
 from auth_models import User, init_database, log_user_activity, get_db_connection
 import audit_logs
 from werkzeug.security import generate_password_hash, check_password_hash
-try:
-    import bot_deployment
-except ImportError:
-    bot_deployment = None
+import bot_deployment
 
 # Secret key for sessions
 import secrets
@@ -106,7 +89,6 @@ else:
 
 app.secret_key = secret_key
 app.config['SESSION_COOKIE_HTTPONLY'] = True
-app.config["SESSION_COOKIE_SECURE"] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 app.config['PERMANENT_SESSION_LIFETIME'] = 86400  # 24 hours
 
@@ -143,11 +125,10 @@ except Exception as e:
 # ── Environment ────────────────────────────────────────────────────────────────
 
 N4P_SEAT_SECRET = os.getenv('N4P_SEAT_SECRET', 'default_secret_change_me')
-TRACKER_API_KEY = os.getenv('TRACKER_API_KEY', 'trk_prod_1774368827')
+TRACKER_API_KEY = os.getenv('TRACKER_API_KEY', 'trk_default')
 
 # Tuning constants
-SEAT_TTL    = int(os.getenv('N4P_SEAT_TTL',    '120'))  # seconds before stale seat evicted
-BOT_TTL     = int(os.getenv('N4P_BOT_TTL',     '300'))  # seconds before bot-registered seat evicted
+SEAT_TTL    = int(os.getenv('N4P_SEAT_TTL',    '30'))   # seconds before stale seat evicted
 CMD_TTL     = int(os.getenv('N4P_CMD_TTL',     '30'))   # seconds before unacked command expires
 PERSIST_INT = int(os.getenv('N4P_PERSIST_INT', '10'))   # seconds between state snapshots to disk
 STATE_FILE  = Path(os.getenv('N4P_STATE_FILE', '/opt/plo-equity/state_snapshot.json'))
@@ -161,10 +142,12 @@ _bot_seats     = {}   # key: bot_id → {"table_id": str, "seat_index": int, "la
 _seat_bots     = {}   # key: (table_id, seat_index) → bot_id
 _hero_cards    = {}   # key: (table_id, seat_no) → [card, card, ...] — persists across snapshots
 _bot_actions   = {}   # key: bot_id → ["fold", "check", ...] — latest available actions from DOM
-_bot_buttons   = {}   # key: bot_id → {actions: [...], slider: {...}} — latest button detail from DOM
-_acting_bot    = {}   # key: table_id -> bot_id -- who has the action right now
-GAME_ACTIONS   = {'fold', 'check', 'call', 'raise', 'bet', 'allin', 'pot'}
+_bot_buttons   = {}   # key: bot_id → {actions:[...], presets:[...], slider:{...}} — full detection
 _store_lock    = threading.Lock()
+
+# Last-known-good table view cache (prevents UI flicker on partial/empty state)
+_last_good_view = None   # {"view": dict, "ts": float}
+_STALE_MAX_AGE  = 5.0    # seconds: max age before stale cache expires
 
 # ── Hand history (multi-hand ASCII log, FIFO last 20) ──────────────────────────
 _hand_history  = []   # list of ASCII hand strings, newest last, max 20
@@ -172,21 +155,6 @@ _hand_lock     = threading.Lock()
 HAND_HISTORY_MAX = 20
 
 # ── Static file serving ────────────────────────────────────────────────────────
-
-
-# ── Global error handlers ──────────────────────────────────────────────────────
-@app.errorhandler(413)
-def too_large(e):
-    return jsonify({'ok': False, 'error': 'Payload too large'}), 413
-
-@app.errorhandler(429)
-def rate_limited(e):
-    return jsonify({'ok': False, 'error': 'Rate limit exceeded'}), 429
-
-@app.errorhandler(500)
-def server_error(e):
-    app.logger.error(f'[500] Internal error: {e}')
-    return jsonify({'ok': False, 'error': 'Internal server error'}), 500
 
 @app.route("/")
 def index():
@@ -196,17 +164,26 @@ def index():
         return send_from_directory("static", "index.html")
     return send_from_directory("static", "remote.html")
 
+
+
 @app.route("/remote")
 @app.route("/remote/")
-def remote_ui():
-    return send_from_directory("static", "remote-w4p.html")
-
+def remote_w4p():
+    """W4P Remote Table Control — per-seat button mirror for potlimitomaha.xyz"""
+    resp = make_response(send_from_directory("static", "remote-w4p.html"))
+    resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    resp.headers["Pragma"] = "no-cache"
+    resp.headers["Expires"] = "0"
+    return resp
 
 @app.route("/remotebutton")
-@app.route("/remotebutton/")
-def remotebutton_ui():
-    return send_from_directory("static", "remote-w4p.html")
-
+def remotebutton():
+    """Per-seat button control UI (PokerBet style)"""
+    resp = make_response(send_from_directory("static", "remotebutton.html"))
+    resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    resp.headers["Pragma"] = "no-cache"
+    resp.headers["Expires"] = "0"
+    return resp
 
 @app.route("/shell")
 def shell():
@@ -249,6 +226,15 @@ def _archive_hand(table):
             hole_cards = hc
             break
 
+    # Fallback: check _hero_cards cache (seats may have been overwritten by another bot)
+    if not hole_cards:
+        table_id = table.get("table_id")
+        if table_id:
+            for (tid, sno), cards in _hero_cards.items():
+                if tid == table_id and cards:
+                    hole_cards = list(cards)
+                    break
+
     if not hole_cards:
         return  # Nothing to archive
 
@@ -277,21 +263,7 @@ def normalize_name(name):
 
 
 def make_hand_key(payload):
-    # Board cards are the same for all bots at the same table (dealer_seat is
-    # per-perspective in PokerBet DOM, so using it caused false hand resets on
-    # every snapshot from a different bot).
-    board = payload.get('board', {})
-    cards = []
-    flop = board.get('flop') or []
-    cards.extend(flop)
-    turn = board.get('turn')
-    if turn:
-        cards.append(turn)
-    river = board.get('river')
-    if river:
-        cards.append(river)
-    board_str = ','.join(sorted(cards)) if cards else 'PREFLOP'
-    return f"{payload.get('table_id')}:{board_str}"
+    return f"{payload.get('table_id')}:{payload.get('dealer_seat')}:{payload.get('deal_id')}"
 
 
 def generate_seat_token(table_id, seat_no):
@@ -356,16 +328,15 @@ def clear_bot_seat(bot_id):
         del _seat_bots[seat_key]
 
     del _bot_seats[bot_id]
-    _bot_actions.pop(bot_id, None)
-    _bot_buttons.pop(bot_id, None)
     app.logger.info(f'[BOT_SYNC] {bot_id} unseated')
 
 
 def _build_seats_list(table):
     out = []
-    # Return hero seats only — villains are skipped (remote is hero-control panel)
-    for seat_no, seat in table["seats"].items():
-        seat_data = dict(seat)
+    # Always build exactly 9 seats for 9-max tables
+    max_seats = 9
+    for seat_no in range(1, max_seats + 1):
+        seat = table["seats"].get(seat_no)
         token = generate_seat_token(table["table_id"], seat_no)
         cmd = _command_queue.get(token)
         pending_cmd = cmd["type"] if cmd and cmd.get("status") == "pending" else None
@@ -374,29 +345,52 @@ def _build_seats_list(table):
         seat_key = (table["table_id"], seat_no)
         bot_id = _seat_bots.get(seat_key)
 
-        is_hero = seat_data.get("is_hero", False)
-        has_name = bool(seat_data.get("name")) and seat_data.get("name", "").strip().lower() not in ("empty", "unknown")
-
-        if not has_name:
-            continue  # Skip truly empty/unnamed seats
-
-        if is_hero:
-            # Self-player: keep hole_cards, use cache as fallback
-            own_cards = seat_data.get("hole_cards", [])
-            if not own_cards:
-                own_cards = _hero_cards.get((table["table_id"], seat_no), [])
-            seat_data["hole_cards"] = own_cards
-            seat_data["is_self_player"] = True
-            seat_data["available_actions"] = _bot_actions.get(bot_id, []) if bot_id else []
-            seat_data["buttons"] = _bot_buttons.get(bot_id, {}) if bot_id else {}
+        if seat:
+            seat_data = dict(seat)
+            is_self = seat_data.get("is_hero", False) or bot_id is not None
+            if is_self:
+                # Self-player: use cached hero cards if available
+                cached = _hero_cards.get((table["table_id"], seat_no), [])
+                seat_data["hole_cards"] = cached if cached else seat_data.get("hole_cards", [])
+                seat_data["is_self_player"] = True
+                # Attach available actions from DOM scrape
+                seat_data["available_actions"] = _bot_actions.get(bot_id, []) if bot_id else []
+                seat_data["buttons"] = _bot_buttons.get(bot_id, {}) if bot_id else {}
+                out.append({
+                    **seat_data,
+                    "pending_cmd": pending_cmd,
+                    "bot_id": bot_id,
+                })
+            else:
+                # Villain (face-down cards): treat as empty — only self-players shown
+                out.append({
+                    "seat_no":    seat_no,
+                    "name":       None,
+                    "stack_zar":  0,
+                    "hole_cards": [],
+                    "status":     "empty",
+                    "is_dealer":  False,
+                    "is_hero":    False,
+                    "is_self_player": False,
+                    "last_seen":  None,
+                    "pending_cmd": None,
+                    "bot_id":     None,
+                    "available_actions": [],
+                })
         else:
-            continue  # Skip villains — remote renders heroes only
-
-        out.append({
-            **seat_data,
-            "pending_cmd": pending_cmd,
-            "bot_id": bot_id,
-        })
+            # Empty seat placeholder
+            out.append({
+                "seat_no":    seat_no,
+                "name":       None,
+                "stack_zar":  0,
+                "hole_cards": [],
+                "status":     "empty",
+                "is_dealer":  False,
+                "is_hero":    False,
+                "last_seen":  None,
+                "pending_cmd": None,
+                "bot_id":     None,
+            })
     return out
 
 
@@ -444,12 +438,8 @@ def _sync_hero_cards_to_collector(table_id, table):
     Feed all cached hero cards into the collector accumulator so the engine
     poller (/api/collector/latest) sees every hero's hand automatically.
     Called inside _store_lock after each snapshot update.
-    Only updates when ALL registered bots on this table have cards cached.
     """
     global _coll_accumulated_hands, _coll_board, _coll_last_update, _coll_source
-
-    # Count how many bots are registered on this table
-    registered_bots = sum(1 for (tid, sno) in _seat_bots if tid == table_id)
 
     # Build hands list from all cached hero cards for this table, ordered by seat_no
     hero_entries = sorted(
@@ -458,11 +448,6 @@ def _sync_hero_cards_to_collector(table_id, table):
         key=lambda x: x[0]
     )
     if not hero_entries:
-        return
-
-    # Wait until all registered bots have reported cards
-    if registered_bots > 1 and len(hero_entries) < registered_bots:
-        app.logger.debug(f'[COLLECTOR] Waiting for all bots: {len(hero_entries)}/{registered_bots} reported')
         return
 
     hands = [''.join(cards) for _, cards in hero_entries]
@@ -496,11 +481,9 @@ def _table_view(table):
         "dealer_seat":   table["dealer_seat"],
         "board":         table["board"],
         "state_version": table["state_version"],
-        "active_seat":   table.get("active_seat"),
         "last_updated":  table["last_ts"],
         "seats":         _build_seats_list(table),
         "collector_batch": _get_latest_collector_batch(),
-        "acting_bot_id": _acting_bot.get(table["table_id"]),
     }
 
 # ── P1: State persistence ──────────────────────────────────────────────────────
@@ -540,9 +523,6 @@ def _persist_loop():
         try:
             with _store_lock:
                 snapshot = _serialise_state()
-            # Never overwrite good state with empty state
-            if not snapshot:
-                continue
             # Disk write outside lock
             tmp = STATE_FILE.with_suffix('.tmp')
             tmp.write_text(json.dumps(snapshot, default=str), encoding='utf-8')
@@ -560,30 +540,28 @@ def _cleanup_loop():
         try:
             with _store_lock:
                 for table in list(_tables.values()):
-                    # Evict stale seats — but protect bot-registered seats longer
-                    live = {}
-                    evicted = 0
-                    for sno, seat in table["seats"].items():
-                        age = now - seat.get("last_seen", 0)
-                        seat_key = (table["table_id"], sno)
-                        has_bot = seat_key in _seat_bots
-                        ttl = BOT_TTL if has_bot else SEAT_TTL
-                        if age < ttl:
-                            live[sno] = seat
-                        else:
-                            evicted += 1
-                            # Also clean up bot registration if seat is evicted
-                            if has_bot:
-                                bot_id = _seat_bots.pop(seat_key, None)
-                                if bot_id and bot_id in _bot_seats:
-                                    del _bot_seats[bot_id]
-                                    _bot_actions.pop(bot_id, None)
-                                    _bot_buttons.pop(bot_id, None)
-                                app.logger.info(f"[CLEANUP] evicted bot seat {bot_id} at {seat_key}")
-                    if evicted:
+                    # Evict seats not seen recently
+                    live = {
+                        sno: seat for sno, seat in table["seats"].items()
+                        if seat.get("last_seen") and (now - seat["last_seen"]) < SEAT_TTL
+                    }
+                    evicted_snos = set(table["seats"].keys()) - set(live.keys())
+                    if evicted_snos:
+                        # Clean up all associated state for evicted seats
+                        for sno in evicted_snos:
+                            seat_key = (table['table_id'], sno)
+                            _hero_cards.pop(seat_key, None)
+                            evicted_bot = _seat_bots.pop(seat_key, None)
+                            if evicted_bot:
+                                _bot_seats.pop(evicted_bot, None)
+                                _bot_actions.pop(evicted_bot, None)
+                                _bot_buttons.pop(evicted_bot, None)
+                            tok = generate_seat_token(table['table_id'], sno)
+                            _command_queue.pop(tok, None)
+                            _cashout_state.pop(tok, None)
                         table["seats"] = live
                         app.logger.info(
-                            f"[CLEANUP] table={table['table_id']} evicted {evicted} stale seat(s)"
+                            f"[CLEANUP] table={table['table_id']} evicted {len(evicted_snos)} stale seat(s) + cleaned state"
                         )
 
                 # Expire old commands
@@ -609,18 +587,61 @@ def _cleanup_loop():
         except Exception as e:
             app.logger.warning(f"[CLEANUP] Error: {e}")
 
+
+# ── SSE: Real-time push to remote UI ─────────────────────────────────────────
+import queue as _queue
+
+_sse_clients = []
+_sse_lock = threading.Lock()
+
+def sse_notify(table_data):
+    msg = json.dumps(table_data, default=str)
+    dead = []
+    with _sse_lock:
+        for q in _sse_clients:
+            try:
+                q.put_nowait(msg)
+            except _queue.Full:
+                dead.append(q)
+        for q in dead:
+            _sse_clients.remove(q)
+
+@app.route('/api/stream')
+def sse_stream():
+    q = _queue.Queue(maxsize=50)
+    with _sse_lock:
+        _sse_clients.append(q)
+    def generate():
+        try:
+            with _store_lock:
+                for tid, table in _tables.items():
+                    initial = _table_view(table)
+                    yield f"data: {json.dumps(initial, default=str)}\n\n"
+            while True:
+                try:
+                    msg = q.get(timeout=30)
+                    yield f"data: {msg}\n\n"
+                except _queue.Empty:
+                    yield ": keepalive\n\n"
+        except GeneratorExit:
+            pass
+        finally:
+            with _sse_lock:
+                if q in _sse_clients:
+                    _sse_clients.remove(q)
+    return Response(generate(), mimetype="text/event-stream",
+                    headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
 # ── Endpoint 1: POST /api/snapshot ────────────────────────────────────────────
 
 @app.route('/api/snapshot', methods=['POST'])
 @limiter.limit("300 per minute")   # 5/sec — supports 6 heroes each at 1.5s intervals
 def post_snapshot():
-    api_key = request.headers.get('X-API-Key') or request.args.get('key')
-    valid_keys = {TRACKER_API_KEY, 'trk_default', 'trk_w4p_default'}
-    if api_key not in valid_keys:
-        app.logger.warning(f'[SNAPSHOT] Rejected API key: {repr(api_key)}')
+    api_key = request.headers.get('X-API-Key')
+    if api_key != TRACKER_API_KEY:
         return jsonify({'ok': False, 'error': 'Invalid API key'}), 401
 
-    payload = request.get_json(force=True, silent=True)
+    payload = request.get_json()
     if not payload:
         return jsonify({'ok': False, 'error': 'No payload'}), 400
 
@@ -634,7 +655,7 @@ def post_snapshot():
         return jsonify({'ok': False, 'error': 'No hero seat found'}), 400
 
     # Extract bot identity (hero player name from w4p.js)
-    bot_id = payload.get('bot_id') or payload.get('player_id')
+    bot_id = payload.get('bot_id')
 
     ts = time.time()
     cashout_cmd = None   # built outside lock, queued inside
@@ -651,20 +672,18 @@ def post_snapshot():
             if table["hand_key"] is not None:
                 _archive_hand(table)
             table["hand_key"]     = hand_key
-            # Preserve seat structure for multi-hero: clear cards but keep seats
-            # Keep is_hero=True for seats with registered bots (prevents multi-hero flicker)
-            for sno in table["seats"]:
-                table["seats"][sno]["hole_cards"] = []
-                table["seats"][sno]["status"] = "playing"
-                # Only clear is_hero if no bot is registered for this seat
-                seat_has_bot = _seat_bots.get((table_id, sno)) is not None
-                if not seat_has_bot:
-                    table["seats"][sno]["is_hero"] = False
+            table["seat_map"]     = {}
+            table["seats"]        = {}
+            table["next_seat_no"] = 1
             table["raw_batch"]    = None  # V2: Clear stale batch on hand reset
-            # Keep hero cards cache across hands — each container overwrites on new deal
-            # Clearing here causes race: first container's snapshot shows only 1 hand
-            # Keep bot-seat mappings across hands (bots re-register on next snapshot)
-            # _seat_bots NOT cleared — preserves multi-hero identity across hand resets
+            # Clear cached hero cards for this table
+            stale_keys = [k for k in _hero_cards if k[0] == table_id]
+            for k in stale_keys:
+                del _hero_cards[k]
+            # Clear bot-seat mappings for this table
+            stale_bots = [k for k in _seat_bots if k[0] == table_id]
+            for k in stale_bots:
+                del _seat_bots[k]
             # Flush pending commands + cashout state on hand reset
             for sn in range(1, 10):
                 t = generate_seat_token(table_id, sn)
@@ -680,28 +699,33 @@ def post_snapshot():
         table["variant"]     = payload.get("variant", "plo")
         table["dealer_seat"] = payload.get("dealer_seat")
 
-        # Track active seat from PokerBet DOM (.active class detection)
-        active_player = payload.get("active_player")
-        if active_player:
-            active_name_key = normalize_name(active_player)
-            table["active_seat"] = table["seat_map"].get(active_name_key)
-        else:
-            table["active_seat"] = None
-
         new_seats    = {}
         hero_seat_no = None
 
+        # Prune stale seat_map entries: keep only names currently in seats
+        active_names = set()
+        for existing_sno, existing_seat in table.get("seats", {}).items():
+            n = normalize_name(existing_seat.get("name"))
+            if n: active_names.add(n)
         for s in seats_raw:
-            # Skip nameless seats — prevents ghost 'anon_X' entries
-            raw_name = s.get("name")
-            if not raw_name or str(raw_name).strip().lower() in ('none', '', 'null'):
-                continue
-            name_key = normalize_name(raw_name)
-            if not name_key:
-                continue
+            n = normalize_name(s.get("name"))
+            if n: active_names.add(n)
+        stale = [k for k in table["seat_map"] if k not in active_names]
+        for k in stale:
+            del table["seat_map"][k]
+        if stale:
+            table["next_seat_no"] = max(table["seat_map"].values(), default=0) + 1
+
+        for s in seats_raw:
+            name_key = normalize_name(s.get("name")) or f"anon_{s.get('seat_index', id(s))}"
             if name_key not in table["seat_map"]:
-                table["seat_map"][name_key] = table["next_seat_no"]
-                table["next_seat_no"] += 1
+                used = set(table["seat_map"].values())
+                assigned = next((n for n in range(1, 10) if n not in used), table["next_seat_no"])
+                table["seat_map"][name_key] = assigned
+                table["next_seat_no"] = max(table["next_seat_no"], assigned + 1)
+
+
+
             seat_no = table["seat_map"][name_key]
             new_seats[seat_no] = {
                 "seat_no":    seat_no,
@@ -710,53 +734,43 @@ def post_snapshot():
                 "hole_cards": s.get("hole_cards", []),
                 "status":     s.get("status", "empty"),
                 "is_dealer":  s.get("is_dealer", False),
-                "is_hero":    False,  # Set below only for the actual hero
-                "bet":        s.get("bet", 0),
+                "is_hero":    s.get("is_hero", False),
                 "last_seen":  ts,
             }
             if s.get("is_hero"):
                 hero_seat_no = seat_no
-                new_seats[seat_no]["is_hero"] = True
 
-        # MERGE: update only the seats from this snapshot (hero-only safe)
-        # No aggressive cleanup — _build_seats_list() filters non-self seats at read time
+        # Merge seats: protect other bots' data (hole_cards, is_hero) from overwrite
         for sno, sdata in new_seats.items():
-            # Preserve is_hero from existing data if this seat has a registered bot
-            existing = table["seats"].get(sno, {})
             existing_bot = _seat_bots.get((table_id, sno))
-            if existing_bot and not sdata.get("is_hero"):
-                # Another bot owns this seat — don't overwrite their hero status
-                sdata["is_hero"] = existing.get("is_hero", False)
-            table["seats"][sno] = sdata
+            if existing_bot and bot_id and existing_bot != bot_id:
+                # Seat owned by a different bot — update metadata only
+                existing = table["seats"].get(sno)
+                if existing:
+                    existing["stack_zar"] = sdata.get("stack_zar", existing.get("stack_zar"))
+                    existing["status"] = sdata.get("status", existing.get("status"))
+                    existing["is_dealer"] = sdata.get("is_dealer", existing.get("is_dealer"))
+                    existing["last_seen"] = sdata["last_seen"]
+                else:
+                    table["seats"][sno] = sdata
+            else:
+                table["seats"][sno] = sdata
         table["last_ts"]       = ts
         table["state_version"] += 1
 
-        # ── Multi-hero: cache hero cards and bot mapping by seat_no ──
-        # This runs AFTER seat_map so we have the correct seat_no
-        if bot_id and hero_seat_no is not None:
-            update_bot_seat_mapping(bot_id, table_id, hero_seat_no)
+        # ── Multi-hero: always cache hero cards, bot mapping when bot_id present ──
+        if hero_seat_no is not None:
             hero_hc = hero_seat.get('hole_cards', [])
             if hero_hc:
                 _hero_cards[(table_id, hero_seat_no)] = hero_hc
-            # Cache available actions from hero's DOM scrape (filter to game actions only)
-            raw_actions = hero_seat.get('available_actions', []) or payload.get('available_actions', [])
-            game_actions = [a for a in raw_actions if a.lower() in GAME_ACTIONS]
-            if raw_actions:
-                app.logger.info(f'[ACTIONS] bot={bot_id} seat={hero_seat_no} raw={raw_actions} game={game_actions}')
-            # Cache button state (call amounts, slider range, presets) for remote UI
-            raw_buttons = payload.get("buttons") or hero_seat.get("buttons")
-            _bot_buttons[bot_id] = raw_buttons if isinstance(raw_buttons, dict) else {}
-            _bot_actions[bot_id] = game_actions
-            # Turn tracking: whoever POSTs game actions IS the acting player
-            if game_actions:
-                _acting_bot[table_id] = bot_id
-#DISABLED#                 # Clear stale actions from other bots (only one acts at a time)
-#DISABLED#                 for other_bot, info in _bot_seats.items():
-#DISABLED#                     if info.get("table_id") == table_id and other_bot != bot_id:
-#DISABLED#                         _bot_actions[other_bot] = []
-            elif _acting_bot.get(table_id) == bot_id:
-                # This bot no longer has game actions — clear acting status
-                _acting_bot.pop(table_id, None)
+            if bot_id:
+                update_bot_seat_mapping(bot_id, table_id, hero_seat_no)
+                avail_actions = payload.get('available_actions', [])
+                _bot_actions[bot_id] = avail_actions
+                buttons = payload.get('buttons')
+                if buttons:
+                    _bot_buttons[bot_id] = buttons
+
         # V2: Sync latest collector batch into table state
         _sync_collector_batch_to_table(table_id)
 
@@ -783,6 +797,13 @@ def post_snapshot():
     # Log outside lock
     if cashout_cmd:
         app.logger.info(f"[CASHOUT] Auto-queued table={table_id} seat_no={hero_seat_no}")
+    # Push to SSE clients immediately
+    try:
+        with _store_lock:
+            if table_id in _tables:
+                sse_notify(_table_view(_tables[table_id]))
+    except Exception:
+        pass
 
     return jsonify({
         'ok':         True,
@@ -801,15 +822,11 @@ def get_pending_command():
         return jsonify({'ok': False, 'error': 'Missing token or bot_id'}), 400
 
     with _store_lock:
-        # If bot_id provided, look up this bot's seat and only return its command
+        # If bot_id provided (from bot containers), scan all pending commands
         if bot_id and not token:
-            bot_info = _bot_seats.get(bot_id)
-            if bot_info:
-                expected_token = generate_seat_token(bot_info['table_id'], bot_info.get('seat_no', bot_info.get('seat_index')))
-                cmd = _command_queue.get(expected_token)
+            for qtoken, cmd in list(_command_queue.items()):
                 if cmd and cmd.get('status') == 'pending':
-                    cmd['_token'] = expected_token
-                    app.logger.info(f'[CMD] Matched pending command {cmd.get("id")} to {bot_id} (seat {bot_info.get("seat_no", bot_info.get("seat_index"))})')
+                    cmd['_token'] = qtoken  # include token so bot can ack
                     return jsonify({'ok': True, 'command': cmd})
             return jsonify({'ok': True, 'command': None})
 
@@ -822,7 +839,7 @@ def get_pending_command():
 
 @app.route('/api/commands/ack', methods=['POST'])
 def ack_command():
-    payload = request.get_json(force=True, silent=True)
+    payload = request.get_json()
     if not payload:
         return jsonify({'ok': False, 'error': 'No payload'}), 400
 
@@ -844,7 +861,7 @@ def ack_command():
 
 @app.route('/api/commands/queue', methods=['POST'])
 def queue_command():
-    payload = request.get_json(force=True, silent=True)
+    payload = request.get_json()
     if not payload:
         return jsonify({'ok': False, 'error': 'No payload'}), 400
 
@@ -868,13 +885,17 @@ def queue_command():
             return jsonify({'ok': False, 'error': 'Seat not connected'}), 404
 
         command_id = str(uuid.uuid4())[:8]
-        _command_queue[token] = {
+        cmd_obj = {
             'id':        command_id,
             'type':      command_type,
             'amount':    amount,
             'queued_at': time.time(),
             'status':    'pending',
         }
+        sel = payload.get('selector')
+        if sel:
+            cmd_obj['selector'] = sel
+        _command_queue[token] = cmd_obj
 
     app.logger.info(f"[CMD] Queued {command_type} cmd={command_id} table={table_id} seat={seat_no}")
     return jsonify({'ok': True, 'command_id': command_id})
@@ -886,11 +907,14 @@ def report_actions():
     payload = request.get_json()
     if not payload:
         return jsonify({'ok': False, 'error': 'No payload'}), 400
-    bot_id = payload.get('bot_id') or payload.get('player_id')
+    bot_id = payload.get('bot_id')
     actions = payload.get('available_actions', [])
     if not bot_id:
         return jsonify({'ok': False, 'error': 'Missing bot_id'}), 400
-    _bot_actions[bot_id] = [a for a in actions if a.lower() in GAME_ACTIONS]
+    _bot_actions[bot_id] = actions
+    buttons = payload.get('buttons')
+    if buttons:
+        _bot_buttons[bot_id] = buttons
     return jsonify({'ok': True})
 
 # ── Endpoint 5: GET /api/table/<table_id> ─────────────────────────────────────
@@ -915,15 +939,17 @@ def get_table(table_id):
 
 @app.route('/api/table/latest', methods=['GET'])
 def table_latest():
+    global _last_good_view
+
     # Long polling support - wait for changes
     timeout = int(request.args.get('timeout', 0))  # 0 = no wait (backward compatible)
     max_timeout = 25  # Max 25 seconds
-    
+
     if timeout > 0:
         timeout = min(timeout, max_timeout)
         start_time = time.time()
         last_ts_seen = float(request.args.get('last_ts', 0))
-        
+
         # Wait for new data or timeout
         while (time.time() - start_time) < timeout:
             with _store_lock:
@@ -933,29 +959,71 @@ def table_latest():
                     if table['last_ts'] > last_ts_seen:
                         view = _table_view(table)
                         return jsonify({'ok': True, 'table': view, 'long_poll': True})
-            
+
             # Sleep briefly before checking again (don't spin-lock)
             time.sleep(0.05)  # Check every 50ms
-        
+
         # Timeout reached - return current state anyway
         app.logger.debug('[LONGPOLL] Timeout reached, returning current state')
-    
+
     # Regular polling or timeout - return current state
+    now = time.time()
+
     with _store_lock:
         if not _tables:
+            # No tables at all — use last-known-good if recent enough
+            if _last_good_view and (now - _last_good_view['ts']) < _STALE_MAX_AGE:
+                age_ms = int((now - _last_good_view['ts']) * 1000)
+                return jsonify({
+                    'ok': True,
+                    'table': _last_good_view['view'],
+                    'stale': True,
+                    'age_ms': age_ms,
+                    'source': 'last_known_good',
+                    'long_poll': False
+                })
+            # Truly no data and no recent cache
             return jsonify({
                 'ok': True,
                 'table': {
                     'table_id': 'waiting',
                     'street':   'WAITING',
                     'pot_zar':  0,
-                    'board':    {'flop': [], 'turn': '', 'river': ''},
-                    'seats': []
-                , 'collector_batch': _get_latest_collector_batch()},
+                    'board':    {'flop': [], 'turn': None, 'river': None},
+                    'seats': [
+                        {
+                            'seat_no': i, 'name': None, 'stack_zar': 0,
+                            'hole_cards': [], 'status': 'empty',
+                            'is_dealer': False, 'is_hero': False,
+                            'last_seen': None, 'pending_cmd': None,
+                        }
+                        for i in range(1, 10)
+                    ],
+                    'collector_batch': _get_latest_collector_batch()
+                },
                 'long_poll': False
             })
+
         table = max(_tables.values(), key=lambda t: t['last_ts'])
-        view  = _table_view(table)
+        view = _table_view(table)
+
+        # Determine if this is a "good" view (has at least one occupied seat)
+        occupied = [s for s in view.get('seats', []) if s.get('name')]
+        if occupied:
+            # Fresh, valid state — update cache
+            _last_good_view = {'view': view, 'ts': now}
+        elif _last_good_view and (now - _last_good_view['ts']) < _STALE_MAX_AGE:
+            # Current state is partial/empty but we have recent good data
+            age_ms = int((now - _last_good_view['ts']) * 1000)
+            return jsonify({
+                'ok': True,
+                'table': _last_good_view['view'],
+                'stale': True,
+                'age_ms': age_ms,
+                'source': 'last_known_good',
+                'long_poll': False
+            })
+
     return jsonify({'ok': True, 'table': view, 'long_poll': False})
 
 
@@ -1514,8 +1582,6 @@ def collector_latest():
         out_lines = list(_coll_accumulated_hands)
         board = _coll_board
 
-    if board:
-        out_lines.append(board)
     raw_text = chr(10).join(out_lines)
 
     app.logger.info('[COLLECTOR] success: %d hands, board=%s, source=%s', len(out_lines), bool(board), _coll_source)
@@ -1963,27 +2029,8 @@ def api_goldrush_latest():
         app.logger.error(f"[GoldRush] Error: {e}")
         return jsonify({"ok": False, "error": str(e)}), 500
 
-def _graceful_shutdown(signum, frame):
-    """Save state before exit so restarts don't lose data."""
-    app.logger.info('[SHUTDOWN] Saving state before exit...')
-    try:
-        with _store_lock:
-            snapshot = _serialise_state()
-        if snapshot:
-            tmp = STATE_FILE.with_suffix('.tmp')
-            tmp.write_text(json.dumps(snapshot, default=str), encoding='utf-8')
-            tmp.replace(STATE_FILE)
-            app.logger.info(f'[SHUTDOWN] Saved {len(snapshot)} table(s)')
-    except Exception as e:
-        app.logger.warning(f'[SHUTDOWN] Save failed: {e}')
-    sys.exit(0)
-
-import signal
-signal.signal(signal.SIGTERM, _graceful_shutdown)
-signal.signal(signal.SIGINT, _graceful_shutdown)
-
 if __name__ == '__main__':
-    app.run(host="127.0.0.1", port=int(os.environ.get("FLASK_PORT", 5003)), debug=False)
+    app.run(host='0.0.0.0', port=5000, debug=False)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -2207,7 +2254,7 @@ def scrape_tables_endpoint():
         return jsonify({
             "ok": False,
             "error": str(e),
-            "traceback": "Internal server error"  # traceback stripped for security
+            "traceback": traceback.format_exc()
         }), 500
 
 
