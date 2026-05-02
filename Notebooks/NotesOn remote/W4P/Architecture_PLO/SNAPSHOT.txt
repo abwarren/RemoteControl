@@ -1,0 +1,8 @@
+Content-Type: text/x-zim-wiki
+Wiki-Format: zim 0.6
+Creation-Date: 2026-04-30T13:45:43+02:00
+
+====== SNAPSHOT ======
+Created Thursday 30 April 2026
+
+The snapshot is named dublin-c5-snapshot-2026-04-30 (snap-0019a6ab9980fc4d1).

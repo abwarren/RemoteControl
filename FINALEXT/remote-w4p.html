@@ -856,7 +856,11 @@ function fetchTable() {
         dot.className = 'conn-dot ok';
         label.textContent = 'v' + (j.table.state_version || '?');
         var json = JSON.stringify(j.table);
-        if (json === _lastTableJSON) { schedulePoll(); return; }
+        if (json === _lastTableJSON) {
+          // Table unchanged — still fire war engine (commands may be pending)
+          if (khRaiseWar) fireKHRaiseWar();
+          schedulePoll(); return;
+        }
         _lastTableJSON = json;
         lastTable = j.table;
       } else {
@@ -1950,7 +1954,9 @@ function globalResumeAll() {
 // When active: both KH seats auto-raise/bet max whenever it's their turn
 // Non-KH seats get auto-folded whenever they have action (re-raised into the hand)
 // When one seat runs out of chips (stack=0 or no raise available): CO fires on CO seat
+// Fallback: if raise_max fails (short-stacked), next cycle sends plain 'raise' (shoves remaining)
 var khRaiseLastSent = {};  // seatNo -> timestamp (throttle)
+var khRaiseMaxAttempt = {};  // seatNo -> timestamp of last raise_max attempt (for fallback)
 function fireKHRaiseWar() {
   if (!khRaiseWar || !lastTable || !Array.isArray(lastTable.seats)) return;
   var now = Date.now();
@@ -1979,16 +1985,36 @@ function fireKHRaiseWar() {
       return;
     }
 
-    // KH seats: raise/bet max → call → check (war escalation)
+    // KH seats: raise_max → fallback to raise (shove) → call → check
     if (acts.indexOf('raise') >= 0) {
-      sendCmd(sn, 'raise_max');
-      khRaiseLastSent[sn] = now;
-      console.log('[KH_WAR] RAISE MAX seat=' + sn);
+      var maxAttemptTime = khRaiseMaxAttempt[sn] || 0;
+      if (now - maxAttemptTime > 1500) {
+        // First attempt: try raise_max
+        sendCmd(sn, 'raise_max');
+        khRaiseMaxAttempt[sn] = now;
+        khRaiseLastSent[sn] = now;
+        console.log('[KH_WAR] RAISE MAX seat=' + sn);
+      } else {
+        // raise_max already tried but raise still available = MAX failed (short stack)
+        // Fallback: plain raise = shove remaining chips
+        sendCmd(sn, 'raise');
+        khRaiseLastSent[sn] = now;
+        delete khRaiseMaxAttempt[sn];
+        console.log('[KH_WAR] RAISE SHOVE seat=' + sn + ' (max failed, shoving remaining)');
+      }
     } else if (acts.indexOf('bet') >= 0) {
-      // First-to-act on new street = BET (not raise)
-      sendCmd(sn, 'raise_max');
-      khRaiseLastSent[sn] = now;
-      console.log('[KH_WAR] BET MAX seat=' + sn);
+      var maxAttemptTime2 = khRaiseMaxAttempt[sn] || 0;
+      if (now - maxAttemptTime2 > 1500) {
+        sendCmd(sn, 'raise_max');
+        khRaiseMaxAttempt[sn] = now;
+        khRaiseLastSent[sn] = now;
+        console.log('[KH_WAR] BET MAX seat=' + sn);
+      } else {
+        sendCmd(sn, 'raise');
+        khRaiseLastSent[sn] = now;
+        delete khRaiseMaxAttempt[sn];
+        console.log('[KH_WAR] BET SHOVE seat=' + sn + ' (max failed, shoving remaining)');
+      }
     } else if (acts.indexOf('call') >= 0) {
       // All-in call if can't raise
       sendCmd(sn, 'call');
@@ -2001,19 +2027,8 @@ function fireKHRaiseWar() {
     }
   });
 
-  // War ends when neither KH seat has raise/call/bet available (hand over)
-  var warActive = false;
-  lastTable.seats.forEach(function(seat) {
-    if (!seat.is_self_player) return;
-    var sn = getSeatNo(seat);
-    if (khRaiseSeats.indexOf(sn) < 0) return;
-    var acts = seat.available_actions || [];
-    if (acts.length > 0) warActive = true;
-  });
-  if (!warActive && khExecuted) {
-    console.log('[KH_WAR] hand resolved — war complete, CO pre-armed');
-    khRaiseWar = false;
-  }
+  // War persists until new hand resets it (checkNewHand clears khRaiseWar).
+  // Do NOT end war based on empty actions — between-turn gaps cause false termination.
 }
 
 // -- C/C ALL PREFLOP engine --
@@ -2099,6 +2114,7 @@ function checkNewHand() {
       khRaiseSeats = [];
       khCOSeat = null;
       khRaiseLastSent = {};
+      khRaiseMaxAttempt = {};
       autoCcLastSent = {};
       globalCFExcluded = {};
       seatAmounts = {};

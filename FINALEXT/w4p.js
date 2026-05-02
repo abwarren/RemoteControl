@@ -524,7 +524,9 @@
         if (c) boardCards.push(c);
       }
     }
-    if (boardCards.length < 3) {
+    // Fallback ONLY if sg-poker-board doesn't exist (DOM structure changed)
+    // Never fallback when boardEl exists — preflop legitimately has 0 cards
+    if (!boardEl) {
       var allCardEls = document.querySelectorAll('.single-cart-view-p');
       boardCards = [];
       for (var i = 0; i < allCardEls.length; i++) {
