@@ -1,13 +1,28 @@
 {
   "manifest_version": 3,
   "name": "FINALEXT",
-  "version": "6.1",
-  "description": "Injects w4p.js into PokerBet poker tables - MAIN world, direct fetch",
+  "version": "6.2",
+  "description": "Injects w4p.js into PokerBet poker tables - MAIN world, direct fetch + auto-login",
   "permissions": [],
   "host_permissions": [
     "https://potlimitomaha.xyz/*"
   ],
+  "web_accessible_resources": [
+    {
+      "resources": ["credentials.json"],
+      "matches": ["*://*.pokerbet.co.za/*"]
+    }
+  ],
   "content_scripts": [
+    {
+      "matches": [
+        "*://*.pokerbet.co.za/*"
+      ],
+      "js": ["autologin.js"],
+      "run_at": "document_idle",
+      "all_frames": false,
+      "world": "ISOLATED"
+    },
     {
       "matches": [
         "*://*.pokerbet.co.za/*",

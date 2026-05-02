@@ -973,7 +973,7 @@ function getActionData(seat, actionName) {
 // -- Build seat box HTML with inline controls --
 
 function buildSeatBoxHtml(seat) {
-  var isHero = seat.is_self_player === true;
+  var isHero = seat.is_self_player === true || seat.is_hero === true || (seat.name && seat.name !== 'Empty');
   var acts = seat.available_actions || [];
   var sn = getSeatNo(seat);
 
