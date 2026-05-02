@@ -1021,7 +1021,7 @@ function buildSeatBoxHtml(seat) {
   }
 
   // ========== HERO SEAT CONTROLS ==========
-  if (isHero) {
+  if (seat.name) {
     // Compact controls: always visible (C/F, C/C, CO)
     var curPa = preActionState[sn] || null;
     var curCo = cashoutState[sn] || false;
