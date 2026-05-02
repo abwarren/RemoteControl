@@ -1,9 +1,16 @@
-- Aceking5
-- Beko
-- Benne
-- Den1
-- Devsup
-- cclark
-- jcolls
-- kschoeler
-- nicole0804
+# W4P Players - Verified 2026-05-02
+# All logins confirmed working from Dublin c5
+# Format: username | password | balance (ZAR)
+
+kschoeler    | PokerPass123  | 799.71 R
+Aceking5     | PokerPass123  | 472.32 R
+jcolls       | PokerPass123  | 300.90 R
+Beko         | PokerPass123  | 1149.04 R
+Benne        | PokerPass123  | 4242.26 R
+Den1         | Den1@123      | 403.46 R
+Devsup       | PokerPass123  | 1123.83 R
+nicole0804   | Pokerpass123  | 232.68 R
+cclark       | RokerPass123  | 488.38 R
+
+# Total: R9,211.88 across 9 accounts
+# Note: Den1 has unique password, nicole0804 has lowercase 'p', cclark has 'R' not 'P'
