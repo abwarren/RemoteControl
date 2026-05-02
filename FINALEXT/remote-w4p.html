@@ -114,11 +114,11 @@
   .board-cards .card-mini .rank { font-size: 1.6em; }
   .board-cards .card-mini .suit { font-size: 1.8em; }
 
-  /* Hole cards -- smaller */
-  .hole-cards-row { display: flex; gap: 2px; justify-content: center; }
-  .hole-cards-row .card-mini { width: 26px; height: 34px; }
-  .hole-cards-row .card-mini .rank { font-size: 0.7em; }
-  .hole-cards-row .card-mini .suit { font-size: 0.8em; margin-top: -1px; }
+  /* Hole cards */
+  .hole-cards-row { display: flex; gap: 4px; justify-content: center; }
+  .hole-cards-row .card-mini { width: 38px; height: 50px; }
+  .hole-cards-row .card-mini .rank { font-size: 1.1em; }
+  .hole-cards-row .card-mini .suit { font-size: 1.2em; margin-top: -1px; }
 
   /* Card placeholder (undealt) */
   .card-placeholder {
@@ -163,26 +163,26 @@
   /* -- Seat box -- */
   .seat-box {
     width: 100%;
-    height: 240px;
+    height: auto;
     background: rgba(13, 17, 23, 0.92);
     border: 2px solid rgba(255,255,255,0.1);
-    border-radius: 10px;
-    padding: 10px 12px;
+    border-radius: 8px;
+    padding: 6px 8px;
     text-align: center;
     transition: border-color 0.08s;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+    box-shadow: 0 3px 8px rgba(0,0,0,0.5);
     position: relative;
-    contain: layout style;
-    overflow: hidden;
+    overflow: visible;
     display: flex;
     flex-direction: column;
+    gap: 3px;
   }
   .seat-box.empty {
     opacity: 0.3;
     border-style: dashed;
     border-color: rgba(255,255,255,0.12);
     background: rgba(13,17,23,0.4);
-    height: 240px;
+    min-height: 60px;
   }
   .seat-box.hero {
     border-color: #1976d2;
@@ -347,10 +347,10 @@
   .sa-btn {
     flex: 1;
     min-width: 0;
-    height: 26px;
+    height: 34px;
     border: none;
-    border-radius: 4px;
-    font-size: 0.75em;
+    border-radius: 5px;
+    font-size: 0.85em;
     font-weight: 800;
     cursor: pointer;
     color: #fff;
@@ -1065,16 +1065,16 @@ function buildSeatBoxHtml(seat) {
 
       // Row 1: FOLD, CHECK, CALL, BET/RAISE
       html += '<div class="sa-row">';
-      var foldAvail = isActive && acts.indexOf('fold') >= 0;
-      html += '<button class="sa-btn fold" data-sa-cmd="fold" data-sa-seat="' + sn + '"' + (foldAvail ? '' : ' disabled') + '>FOLD</button>';
-      var checkAvail = isActive && acts.indexOf('check') >= 0;
-      html += '<button class="sa-btn check" data-sa-cmd="check" data-sa-seat="' + sn + '"' + (checkAvail ? '' : ' disabled') + '>CHECK</button>';
-      var callAvail = isActive && acts.indexOf('call') >= 0;
+      var foldAvail = true;
+      html += '<button class="sa-btn fold" data-sa-cmd="fold" data-sa-seat="' + sn + '">FOLD</button>';
+      var checkAvail = true;
+      html += '<button class="sa-btn check" data-sa-cmd="check" data-sa-seat="' + sn + '">CHECK</button>';
+      var callAvail = true;
       var callData = getActionData(seat, 'call');
       var callLabel = callData && callData.amount != null ? 'CALL R' + callData.amount : 'CALL';
-      html += '<button class="sa-btn call" data-sa-cmd="call" data-sa-seat="' + sn + '"' + (callAvail ? '' : ' disabled') + '>' + callLabel + '</button>';
-      var brAvail = isActive && (hasRaise || hasBet);
-      html += '<button class="sa-btn ' + raiseWord + '" data-sa-cmd="' + raiseWord + '" data-sa-seat="' + sn + '" data-sa-use-amount="1"' + (brAvail ? '' : ' disabled') + '>' + raiseWord.toUpperCase() + '</button>';
+      html += '<button class="sa-btn call" data-sa-cmd="call" data-sa-seat="' + sn + '">' + callLabel + '</button>';
+      var brAvail = true;
+      html += '<button class="sa-btn ' + raiseWord + '" data-sa-cmd="' + raiseWord + '" data-sa-seat="' + sn + '" data-sa-use-amount="1">' + raiseWord.toUpperCase() + '</button>';
       html += '</div>';
 
       // Presets + Slider (always rendered)
