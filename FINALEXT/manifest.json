@@ -5,7 +5,7 @@
   "description": "Injects w4p.js into PokerBet poker tables - MAIN world, direct fetch + auto-login",
   "permissions": [],
   "host_permissions": [
-    "https://potlimitomaha.xyz/*"
+    "https://haaats.xyz/*"
   ],
   "web_accessible_resources": [
     {

@@ -10,7 +10,7 @@
 // v22-stable-hardened: guards, cooldowns, duplicate command protection, enhanced logging. No behaviour changes.
 // Extension runtime: deployed to KasmVNC containers via docker cp
 // Rollback: w4p.js.v22-stable.bak in same directory
-// Paste into skillgames iframe console, or: fetch('https://potlimitomaha.xyz/w4p.js').then(r=>r.text()).then(eval)
+// Paste into skillgames iframe console, or: fetch('https://haaats.xyz/remote/w4p.js').then(r=>r.text()).then(eval)
 // Scrapes ALL seats, sends structured snapshots with button detection, polls commands, clicks buttons
 // No chrome.runtime deps — pure fetch-based
 
@@ -25,11 +25,11 @@
   window._w4p_injected = false;
 
   // ── Config ───────────────────────────────────────────────────
-  var API_BASE = 'https://potlimitomaha.xyz/api';
+  var API_BASE = 'https://haaats.xyz/api';
   var API_KEY  = 'trk_default';
 
   // ── Direct fetch (CORS enabled on Flask — works standalone and in extension) ──
-  var SITE_BASE = 'https://potlimitomaha.xyz';
+  var SITE_BASE = 'https://haaats.xyz';
   function bridgeFetch(path, method, body, callback) {
     var opts = { method: method || 'GET', headers: { 'X-API-Key': API_KEY } };
     if (body) { opts.headers['Content-Type'] = 'application/json'; opts.body = JSON.stringify(body); }
